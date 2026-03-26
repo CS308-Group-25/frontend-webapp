@@ -13,6 +13,7 @@ export default function ConsentModal({ isOpen, onClose }: ConsentModalProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 
@@ -29,7 +30,7 @@ export default function ConsentModal({ isOpen, onClose }: ConsentModalProps) {
           <X className="w-5 h-5 md:w-6 md:h-6" strokeWidth={1.5} />
         </button>
         <div className="text-[11px] sm:text-xs md:text-[13px] font-medium text-black leading-6 sm:leading-7 text-justify tracking-wide">
-          "SUpplements" Gıda A.Ş. tarafından www.supplements.com websitesi aracılığıyla yeni ürünler ve kampanyaların tanıtımı başta olmak üzere, tarafıma ticari elektronik ileti gönderilmesi amacıyla SUpplements ile paylaşmış olduğum veya ilerleyen dönemlerde paylaşacağım telefon ve eposta ve mobil uygulamalar aracılığıyla adresimin kullanılmasına ve işbu iletişim araçları ile şahsımla iletişime geçilmesine, telefon ile arama yapılmasına bu kapsamda paylaşmış olduğum bilgilerin SUpplements tarafından saklanmasına, kullanılmasına ve ticari elektronik iletinin içeriğinin ve gönderiye ilişkin diğer kayıtların gerektiğinde Gümrük ve Ticaret Bakanlığı'na sunulmak üzere kayıt altına alınarak saklanmasına onay veriyorum.
+          &quot;SUpplements&quot; Gıda A.Ş. tarafından www.supplements.com websitesi aracılığıyla yeni ürünler ve kampanyaların tanıtımı başta olmak üzere, tarafıma ticari elektronik ileti gönderilmesi amacıyla SUpplements ile paylaşmış olduğum veya ilerleyen dönemlerde paylaşacağım telefon ve eposta ve mobil uygulamalar aracılığıyla adresimin kullanılmasına ve işbu iletişim araçları ile şahsımla iletişime geçilmesine, telefon ile arama yapılmasına bu kapsamda paylaşmış olduğum bilgilerin SUpplements tarafından saklanmasına, kullanılmasına ve ticari elektronik iletinin içeriğinin ve gönderiye ilişkin diğer kayıtların gerektiğinde Gümrük ve Ticaret Bakanlığı&apos;na sunulmak üzere kayıt altına alınarak saklanmasına onay veriyorum.
         </div>
       </div>
     </div>,
