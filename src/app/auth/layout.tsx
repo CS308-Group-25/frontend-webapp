@@ -2,25 +2,14 @@ import React from 'react';
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+    <div className="flex-1 flex flex-col justify-start items-center relative overflow-hidden py-10 px-4 sm:px-6 lg:px-8">
       {/* Decorative background blobs for a modern/premium feel */}
-      <div className="absolute top-0 -left-4 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-2xl opacity-30 animate-blob"></div>
-      <div className="absolute top-0 -right-4 w-72 h-72 bg-indigo-300 rounded-full mix-blend-multiply filter blur-2xl opacity-30 animate-blob animation-delay-2000"></div>
-      <div className="absolute -bottom-8 left-20 w-72 h-72 bg-pink-300 rounded-full mix-blend-multiply filter blur-2xl opacity-30 animate-blob animation-delay-4000"></div>
+      <div className="absolute top-20 -left-10 w-96 h-96 bg-purple-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
+      <div className="absolute top-40 -right-10 w-96 h-96 bg-indigo-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
+      <div className="absolute bottom-40 left-1/4 w-96 h-96 bg-pink-100 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob animation-delay-4000"></div>
       
-      {/* Brand Header */}
-      <div className="mb-8 text-center z-10 w-full max-w-xl flex items-center justify-between">
-         {/* Using a sleek typography treatment for the logo as requested by user */}
-        <h1 className="text-4xl font-black tracking-tighter text-indigo-900 drop-shadow-sm">
-          SU<span className="text-indigo-600">pplements</span>
-        </h1>
-        <div className="text-sm font-semibold text-gray-500 uppercase tracking-widest hidden sm:block">
-          Gücüne Güç Kat
-        </div>
-      </div>
-
       {/* Page Content Injection */}
-      <div className="w-full relative z-10">
+      <div className="w-full max-w-xl relative z-10 transition-all duration-700 animate-in fade-in zoom-in-95">
         {children}
       </div>
     </div>

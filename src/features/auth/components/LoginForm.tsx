@@ -90,10 +90,10 @@ export default function LoginForm() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className={`w-full group flex items-center justify-center gap-2 py-3 rounded-2xl text-base font-black tracking-wide text-white transition-all duration-300 shadow-xl shadow-blue-800/20 
+            className={`w-full group flex items-center justify-center gap-2 py-3 rounded-2xl text-base font-black tracking-wide text-white transition-all duration-300 shadow-xl shadow-indigo-600/20 
               ${isSubmitting 
-                ? 'bg-blue-600/70 cursor-not-allowed' 
-                : 'bg-blue-800 hover:bg-blue-900 hover:shadow-blue-900/40 active:scale-[0.98]'
+                ? 'bg-indigo-400 cursor-not-allowed' 
+                : 'bg-indigo-600 hover:bg-indigo-700 hover:shadow-indigo-600/40 active:scale-[0.98]'
               }`}
           >
             {isSubmitting ? (

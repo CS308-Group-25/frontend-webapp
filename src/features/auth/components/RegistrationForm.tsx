@@ -4,12 +4,14 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { registrationSchema, RegistrationFormValues } from '../schemas/registration.schema';
-import { Mail, Lock, User, MapPin, Building, Loader2, ArrowRight, Check } from 'lucide-react';
+import { Mail, Lock, User, Loader2, ArrowRight, Check } from 'lucide-react';
 import ConsentModal from './ConsentModal';
+import { registerUser } from '../api/auth.api';
 
 export default function RegistrationForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isConsentModalOpen, setIsConsentModalOpen] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   const {
     register,
@@ -22,11 +24,16 @@ export default function RegistrationForm() {
 
   const onSubmit = async (data: RegistrationFormValues) => {
     setIsSubmitting(true);
-    // Simulate an API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    console.log('Form data submitted: ', data);
-    setIsSubmitting(false);
-    // Next step: redirect or show success toast
+    setApiError(null);
+    try {
+      await registerUser(data);
+      console.log('Registration successful: ', data.email);
+      // Next step: redirect or show success toast
+    } catch (err) {
+      setApiError(err instanceof Error ? err.message : String(err) || 'Bir hata oluştu. Lütfen tekrar deneyin.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -65,6 +72,15 @@ export default function RegistrationForm() {
           <span className="px-4 text-sm text-gray-400 font-medium">veya E-Posta ile</span>
           <div className="border-t border-gray-200 flex-1"></div>
         </div>
+
+        {apiError && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm justify-center flex items-center gap-2">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            {apiError}
+          </div>
+        )}
 
         {/* Form */}
         <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
@@ -159,50 +175,6 @@ export default function RegistrationForm() {
             )}
           </div>
 
-          {/* Address & Tax ID Row */}
-          <div className="grid grid-cols-2 gap-5 pt-2">
-            <div className="relative">
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5 ml-1">Vergi Numarası (TCKN)</label>
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 group-focus-within:text-indigo-500 transition-colors">
-                  <Building className="h-4 w-4" />
-                </div>
-                <input
-                  type="text"
-                  {...register('taxId')}
-                  className={`w-full text-gray-900 placeholder:text-gray-400 pl-10 pr-4 py-2 bg-gray-50 border rounded-xl outline-none transition-all duration-200 focus:bg-white focus:ring-4 ${
-                    errors.taxId
-                      ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
-                      : 'border-gray-200 focus:border-indigo-400 focus:ring-indigo-100 hover:border-gray-300'
-                  }`}
-                />
-              </div>
-              {errors.taxId && (
-                <p className="mt-1.5 ml-1 text-xs text-red-500 font-medium text-nowrap truncate w-full" title={errors.taxId.message}>{errors.taxId.message}</p>
-              )}
-            </div>
-            
-            <div className="relative">
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5 ml-1">Adres</label>
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 group-focus-within:text-indigo-500 transition-colors">
-                  <MapPin className="h-4 w-4" />
-                </div>
-                <input
-                  type="text"
-                  {...register('address')}
-                  className={`w-full text-gray-900 placeholder:text-gray-400 pl-10 pr-4 py-2 bg-gray-50 border rounded-xl outline-none transition-all duration-200 focus:bg-white focus:ring-4 ${
-                    errors.address
-                      ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
-                      : 'border-gray-200 focus:border-indigo-400 focus:ring-indigo-100 hover:border-gray-300'
-                  }`}
-                />
-              </div>
-              {errors.address && (
-                <p className="mt-1.5 ml-1 text-xs text-red-500 font-medium text-nowrap truncate w-full" title={errors.address.message}>{errors.address.message}</p>
-              )}
-            </div>
-          </div>
 
           {/* Terms and Conditions Checkbox */}
           <div className="pt-3 pb-1">

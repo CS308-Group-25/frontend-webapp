@@ -17,12 +17,6 @@ export const registrationSchema = z.object({
     .min(8, { message: 'Password must be at least 8 characters long' })
     .regex(/[A-Z]/, { message: 'Password must contain at least one uppercase letter' })
     .regex(/[0-9]/, { message: 'Password must contain at least one number' }),
-  address: z
-    .string()
-    .min(10, { message: 'Please provide a detailed address (min. 10 characters)' }),
-  taxId: z
-    .string()
-    .min(10, { message: 'Tax ID (VKN/TCKN) must be at least 10 characters' }),
   acceptTerms: z
     .boolean()
     .refine((val) => val === true, {
