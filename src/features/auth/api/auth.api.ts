@@ -6,8 +6,6 @@ export const registerUser = async (data: RegistrationFormValues) => {
     name: `${data.firstName} ${data.lastName}`.trim(),
     email: data.email,
     password: data.password,
-    address: data.address,
-    tax_id: data.taxId,
   };
   return apiClient.post('/v1/auth/register', payload);
 };

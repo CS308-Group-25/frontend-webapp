@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { registrationSchema, RegistrationFormValues } from '../schemas/registration.schema';
-import { Mail, Lock, User, MapPin, Building, Loader2, ArrowRight, Check } from 'lucide-react';
+import { Mail, Lock, User, Loader2, ArrowRight, Check } from 'lucide-react';
 import ConsentModal from './ConsentModal';
 import { registerUser } from '../api/auth.api';
 
@@ -175,50 +175,6 @@ export default function RegistrationForm() {
             )}
           </div>
 
-          {/* Address & Tax ID Row */}
-          <div className="grid grid-cols-2 gap-5 pt-2">
-            <div className="relative">
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5 ml-1">Vergi Numarası (TCKN)</label>
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 group-focus-within:text-indigo-500 transition-colors">
-                  <Building className="h-4 w-4" />
-                </div>
-                <input
-                  type="text"
-                  {...register('taxId')}
-                  className={`w-full text-gray-900 placeholder:text-gray-400 pl-10 pr-4 py-2 bg-gray-50 border rounded-xl outline-none transition-all duration-200 focus:bg-white focus:ring-4 ${
-                    errors.taxId
-                      ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
-                      : 'border-gray-200 focus:border-indigo-400 focus:ring-indigo-100 hover:border-gray-300'
-                  }`}
-                />
-              </div>
-              {errors.taxId && (
-                <p className="mt-1.5 ml-1 text-xs text-red-500 font-medium text-nowrap truncate w-full" title={errors.taxId.message}>{errors.taxId.message}</p>
-              )}
-            </div>
-            
-            <div className="relative">
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5 ml-1">Adres</label>
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 group-focus-within:text-indigo-500 transition-colors">
-                  <MapPin className="h-4 w-4" />
-                </div>
-                <input
-                  type="text"
-                  {...register('address')}
-                  className={`w-full text-gray-900 placeholder:text-gray-400 pl-10 pr-4 py-2 bg-gray-50 border rounded-xl outline-none transition-all duration-200 focus:bg-white focus:ring-4 ${
-                    errors.address
-                      ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
-                      : 'border-gray-200 focus:border-indigo-400 focus:ring-indigo-100 hover:border-gray-300'
-                  }`}
-                />
-              </div>
-              {errors.address && (
-                <p className="mt-1.5 ml-1 text-xs text-red-500 font-medium text-nowrap truncate w-full" title={errors.address.message}>{errors.address.message}</p>
-              )}
-            </div>
-          </div>
 
           {/* Terms and Conditions Checkbox */}
           <div className="pt-3 pb-1">
