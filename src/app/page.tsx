@@ -15,9 +15,12 @@ export default function Home() {
           >
             Hemen Başla
           </a>
-          <button className="px-8 py-3 bg-white text-indigo-600 font-bold border border-indigo-100 rounded-2xl hover:bg-indigo-50 transition-all active:scale-95">
+          <a
+            href="/search"
+            className="px-8 py-3 bg-white text-indigo-600 font-bold border border-indigo-100 rounded-2xl hover:bg-indigo-50 transition-all active:scale-95"
+          >
             Ürünleri İncele
-          </button>
+          </a>
         </div>
       </div>
     </div>
