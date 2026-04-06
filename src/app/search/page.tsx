@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState, useMemo, useEffect } from 'react';
+import { Suspense, useState, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { SlidersHorizontal, ChevronDown, X } from 'lucide-react';
@@ -57,13 +57,6 @@ function SearchContent() {
   };
 
   const clearAllTags = () => setSelectedTags([]);
-
-  // Reset all filter state when navigating between categories (query changes)
-  useEffect(() => {
-    setSelectedTags([]);
-    setSortBy('default');
-    setShowFilters(false);
-  }, [query]);
 
   const filtered = useMemo(() => {
     let result = [...mockProducts];
@@ -195,6 +188,16 @@ function SearchContent() {
   );
 }
 
+/**
+ * Reads the query param and passes it as a key to SearchContent.
+ * When the key changes, React remounts the component, resetting all local state.
+ */
+function SearchPageInner() {
+  const searchParams = useSearchParams();
+  const query = searchParams.get('q') || '';
+  return <SearchContent key={query} />;
+}
+
 export default function SearchPage() {
   return (
     <Suspense
@@ -204,7 +207,7 @@ export default function SearchPage() {
         </div>
       }
     >
-      <SearchContent />
+      <SearchPageInner />
     </Suspense>
   );
 }
