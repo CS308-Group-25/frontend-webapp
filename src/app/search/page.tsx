@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { Suspense, useState, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { Loader2 } from 'lucide-react';
 import { SlidersHorizontal, ChevronDown, X } from 'lucide-react';
 import { mockProducts } from '@/features/products/data/mock-products';
 import ProductGrid from '@/features/products/components/ProductGrid';
@@ -18,7 +19,7 @@ const sortLabels: Record<SortOption, string> = {
 
 const filterTags = ['Protein', 'Kreatin', 'Amino Asit', 'Vitamin', 'Bar', 'Pre-Workout'];
 
-export default function SearchPage() {
+function SearchContent() {
   const searchParams = useSearchParams();
   const query = searchParams.get('q') || '';
 
@@ -161,5 +162,19 @@ export default function SearchPage() {
       {/* Product Grid */}
       <ProductGrid products={filtered} />
     </div>
+  );
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+        </div>
+      }
+    >
+      <SearchContent />
+    </Suspense>
   );
 }
