@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useRouter } from 'next/navigation';
 import { registrationSchema, RegistrationFormValues } from '../schemas/registration.schema';
 import { Mail, Lock, User, Loader2, ArrowRight, Check } from 'lucide-react';
 import ConsentModal from './ConsentModal';
@@ -12,6 +13,7 @@ export default function RegistrationForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isConsentModalOpen, setIsConsentModalOpen] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const router = useRouter();
 
   const {
     register,
@@ -27,8 +29,8 @@ export default function RegistrationForm() {
     setApiError(null);
     try {
       await registerUser(data);
-      console.log('Registration successful: ', data.email);
-      // Next step: redirect or show success toast
+      // Registration successful — redirect to login so user can sign in
+      router.push('/auth/login');
     } catch (err) {
       setApiError(err instanceof Error ? err.message : String(err) || 'Bir hata oluştu. Lütfen tekrar deneyin.');
     } finally {

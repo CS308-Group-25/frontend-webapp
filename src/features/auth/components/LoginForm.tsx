@@ -3,11 +3,16 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useRouter } from 'next/navigation';
 import { Mail, Lock, Loader2 } from 'lucide-react';
 import { loginSchema, LoginFormValues } from '../schemas/login.schema';
+import { loginUser } from '../api/auth.api';
+import { useAuthStore } from '../store/auth.store';
 
 export default function LoginForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
+  const router = useRouter();
 
   const {
     register,
@@ -15,21 +20,42 @@ export default function LoginForm() {
     formState: { errors },
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
-    mode: 'onSubmit', // Hibrit akıllı mod - butona basınca ilk hata görünür
+    mode: 'onSubmit',
   });
 
   const onSubmit = async (data: LoginFormValues) => {
     setIsSubmitting(true);
-    // Simulate an API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    console.log('Login credentials: ', data);
-    setIsSubmitting(false);
-    // Next step: Call login API, then redirect to dashboard
+    setApiError(null);
+    try {
+      const user = await loginUser(data);
+      useAuthStore.getState().setUser(user);
+      router.push('/');
+    } catch (err) {
+      setApiError(
+        typeof err === 'string'
+          ? err
+          : err instanceof Error
+            ? err.message
+            : 'Giriş başarısız. Lütfen bilgilerinizi kontrol edin.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
+
+        {/* API Error Banner */}
+        {apiError && (
+          <div className="p-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm flex items-center gap-2">
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            {apiError}
+          </div>
+        )}
         
         {/* Email */}
         <div className="relative">
