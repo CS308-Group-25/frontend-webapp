@@ -1,15 +1,35 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { User, ChevronDown, LogIn, UserPlus, LogOut, UserCog, Package } from 'lucide-react';
+import {
+  User,
+  ChevronDown,
+  LogIn,
+  UserPlus,
+  LogOut,
+  UserCog,
+  Package,
+  Search,
+} from 'lucide-react';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import { logoutUser } from '@/features/auth/api/auth.api';
+
+const categories = [
+  { label: 'Protein', href: '/search?q=protein' },
+  { label: 'Spor Gıdaları', href: '/search?q=spor' },
+  { label: 'Vitamin', href: '/search?q=vitamin' },
+  { label: 'Amino Asit', href: '/search?q=amino' },
+  { label: 'Sağlık', href: '/search?q=sağlık' },
+  { label: 'Bar & Atıştırmalık', href: '/search?q=bar' },
+  { label: 'Aksesuar', href: '/search?q=aksesuar' },
+];
 
 export default function Header() {
   const { user, isAuthenticated, isLoading } = useAuthStore();
   const router = useRouter();
+  const [searchValue, setSearchValue] = useState('');
 
   const handleLogout = async () => {
     try {
@@ -19,6 +39,13 @@ export default function Header() {
     } finally {
       useAuthStore.getState().clearUser();
       router.push('/');
+    }
+  };
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchValue.trim()) {
+      router.push(`/search?q=${encodeURIComponent(searchValue.trim())}`);
     }
   };
 
@@ -33,20 +60,36 @@ export default function Header() {
   };
 
   return (
-    <header className="w-full py-4 px-4 sm:px-6 lg:px-8 z-50 bg-white/70 backdrop-blur-md border-b border-slate-100 sticky top-0 transition-all duration-300">
-      <div className="max-w-7xl mx-auto flex items-center justify-between">
+    <header className="w-full z-50 bg-white/70 backdrop-blur-md border-b border-slate-100 sticky top-0 transition-all duration-300">
+      {/* Top Bar */}
+      <div className="max-w-7xl mx-auto flex items-center gap-4 py-3 px-4 sm:px-6 lg:px-8">
         {/* Logo */}
-        <Link href="/" className="group flex items-center gap-2 transition-all hover:opacity-90 active:scale-95">
+        <Link href="/" className="group flex items-center gap-2 shrink-0 transition-all hover:opacity-90 active:scale-95">
           <h1 className="text-2xl sm:text-3xl font-black tracking-tighter text-indigo-900 drop-shadow-sm select-none">
             SU<span className="text-indigo-600 transition-colors group-hover:text-indigo-500">pplements</span>
           </h1>
         </Link>
+
+        {/* Search Bar — fixed width, doesn't shift with account button */}
+        <form onSubmit={handleSearch} className="hidden sm:flex w-full max-w-xl relative">
+          <input
+            type="text"
+            value={searchValue}
+            onChange={(e) => setSearchValue(e.target.value)}
+            placeholder="Ürün ara..."
+            className="w-full rounded-xl border border-slate-200 bg-slate-50/80 py-2 pl-4 pr-20 text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none transition-all focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+          />
+          <button
+            type="submit"
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 transition-colors active:scale-95"
+          >
+            <Search className="h-3.5 w-3.5" />
+            Ara
+          </button>
+        </form>
         
         {/* Navigation / Actions */}
-        <div className="flex items-center gap-6">
-          <div className="text-xs font-bold text-slate-400 uppercase tracking-widest hidden lg:block">
-            Gücüne Güç Kat
-          </div>
+        <div className="flex items-center gap-4 shrink-0 ml-auto">
 
           {/* Show skeleton while loading */}
           {isLoading ? (
@@ -168,6 +211,50 @@ export default function Header() {
           )}
         </div>
       </div>
+
+      {/* Mobile Search (visible on small screens only) */}
+      <div className="border-t border-slate-50 px-4 py-2 sm:hidden">
+        <form onSubmit={handleSearch} className="relative flex">
+          <input
+            type="text"
+            value={searchValue}
+            onChange={(e) => setSearchValue(e.target.value)}
+            placeholder="Ürün ara..."
+            className="w-full rounded-lg border border-slate-200 bg-slate-50/80 py-2 pl-4 pr-16 text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none transition-all focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+          />
+          <button
+            type="submit"
+            className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1 rounded-md bg-indigo-600 px-3 py-1 text-xs font-bold text-white"
+          >
+            <Search className="h-3.5 w-3.5" />
+            Ara
+          </button>
+        </form>
+      </div>
+
+      {/* Category Navigation */}
+      <nav className="border-t border-slate-50 bg-white/60 backdrop-blur-sm">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="scrollbar-hide flex items-center gap-1 overflow-x-auto py-2">
+            <Link
+              href="/search"
+              className="shrink-0 rounded-lg px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-indigo-600 transition-all hover:bg-indigo-50"
+            >
+              Tüm Ürünler
+            </Link>
+            <div className="h-4 w-px bg-slate-200" />
+            {categories.map((cat) => (
+              <Link
+                key={cat.label}
+                href={cat.href}
+                className="shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-600 transition-all hover:bg-indigo-50 hover:text-indigo-600"
+              >
+                {cat.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      </nav>
     </header>
   );
 }
