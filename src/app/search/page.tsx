@@ -16,8 +16,31 @@ const sortLabels: Record<SortOption, string> = {
   rating: 'En Yüksek Puan',
   reviews: 'En Çok Yorumlanan',
 };
+/**
+ * Sub-category filters per main category.
+ * When a header category is active, these tags are shown in the filter panel.
+ * When "Tüm Ürünler" is active (no query), main categories are shown instead.
+ */
+const categoryFilters: Record<string, string[]> = {
+  protein: ['Whey', 'Vegan Protein', 'Kazein', 'İzolat', 'Protein Bar'],
+  spor: ['Pre-Workout', 'Kreatin', 'BCAA', 'Gainer', 'Enerji Jeli'],
+  vitamin: ['Multivitamin', 'B12', 'D3', 'C Vitamini', 'Omega-3'],
+  amino: ['BCAA', 'Glutamin', 'L-Karnitin', 'EAA', 'Beta Alanin'],
+  sağlık: ['Probiyotik', 'Kolajen', 'Çinko', 'Magnezyum', 'Balık Yağı'],
+  bar: ['Protein Bar', 'Enerji Bar', 'Granola Bar', 'Fıstık Ezmeli', 'Brownie'],
+  aksesuar: ['Shaker', 'Eldiven', 'Kemer', 'Çanta', 'Bileklik'],
+};
 
-const filterTags = ['Protein', 'Kreatin', 'Amino Asit', 'Vitamin', 'Bar', 'Pre-Workout'];
+const mainCategories = ['Protein', 'Spor Gıdaları', 'Vitamin', 'Amino Asit', 'Sağlık', 'Bar & Atıştırmalık', 'Aksesuar'];
+
+/** Returns the appropriate filter tags based on the current search query */
+function getFilterTags(query: string): string[] {
+  if (!query.trim()) return mainCategories;
+  const q = query.toLowerCase();
+  // Find matching category key
+  const matchedKey = Object.keys(categoryFilters).find((key) => q.includes(key));
+  return matchedKey ? categoryFilters[matchedKey] : mainCategories;
+}
 
 function SearchContent() {
   const searchParams = useSearchParams();
@@ -139,7 +162,7 @@ function SearchContent() {
             )}
           </div>
           <div className="flex flex-wrap gap-2">
-            {filterTags.map((tag) => {
+            {getFilterTags(query).map((tag) => {
               const isActive = selectedTags.includes(tag);
               return (
                 <button
@@ -165,6 +188,16 @@ function SearchContent() {
   );
 }
 
+/**
+ * Reads the query param and passes it as a key to SearchContent.
+ * When the key changes, React remounts the component, resetting all local state.
+ */
+function SearchPageInner() {
+  const searchParams = useSearchParams();
+  const query = searchParams.get('q') || '';
+  return <SearchContent key={query} />;
+}
+
 export default function SearchPage() {
   return (
     <Suspense
@@ -174,7 +207,7 @@ export default function SearchPage() {
         </div>
       }
     >
-      <SearchContent />
+      <SearchPageInner />
     </Suspense>
   );
 }
