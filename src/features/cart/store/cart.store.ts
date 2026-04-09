@@ -106,9 +106,10 @@ export const useCartStore = create<CartState>()(
             try {
               await addCartItem(item.productId, item.quantity);
               succeeded.push(item.productId);
-            } catch (error: any) {
+            } catch (error) {
+              const axiosError = error as any; // Temporary cast to access response, or use a proper type if available
               const reason =
-                error.response?.data?.detail || 'Bilinmeyen bir hata oluştu';
+                axiosError.response?.data?.detail || 'Bilinmeyen bir hata oluştu';
               failed.push({ productId: item.productId, reason });
               console.warn(`[CartStore] Failed to merge item ${item.productId}:`, reason);
             }
