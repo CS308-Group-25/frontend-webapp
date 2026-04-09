@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState, useMemo } from 'react';
+import { Suspense, useState, useMemo, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { SlidersHorizontal, ChevronDown, X } from 'lucide-react';
@@ -16,11 +16,7 @@ const sortLabels: Record<SortOption, string> = {
   rating: 'En Yüksek Puan',
   reviews: 'En Çok Yorumlanan',
 };
-/**
- * Sub-category filters per main category.
- * When a header category is active, these tags are shown in the filter panel.
- * When "Tüm Ürünler" is active (no query), main categories are shown instead.
- */
+
 const categoryFilters: Record<string, string[]> = {
   protein: ['Whey', 'Vegan Protein', 'Kazein', 'İzolat', 'Protein Bar'],
   spor: ['Pre-Workout', 'Kreatin', 'BCAA', 'Gainer', 'Enerji Jeli'],
@@ -31,54 +27,94 @@ const categoryFilters: Record<string, string[]> = {
   aksesuar: ['Shaker', 'Eldiven', 'Kemer', 'Çanta', 'Bileklik'],
 };
 
+import { useRouter, usePathname } from 'next/navigation';
+
 const mainCategories = ['Protein', 'Spor Gıdaları', 'Vitamin', 'Amino Asit', 'Sağlık', 'Bar & Atıştırmalık', 'Aksesuar'];
 
-/** Returns the appropriate filter tags based on the current search query */
 function getFilterTags(query: string): string[] {
   if (!query.trim()) return mainCategories;
   const q = query.toLowerCase();
-  // Find matching category key
   const matchedKey = Object.keys(categoryFilters).find((key) => q.includes(key));
   return matchedKey ? categoryFilters[matchedKey] : mainCategories;
 }
 
+/* ══════════════════════════════════════════════════════════════════ */
+
 function SearchContent() {
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
+  
+  // URL'yi tek bir merkezi "Doğru Kaynak" (Source of Truth) olarak kullanıyoruz.
+  // Bu yöntemle hataların oluşması teknik olarak imkansızdır.
   const query = searchParams.get('q') || '';
+  const sortBy = (searchParams.get('sort') || 'default') as SortOption;
+  const tagsParam = searchParams.get('tags');
+  const selectedTags = tagsParam ? tagsParam.split(',') : [];
+  const showFilters = searchParams.get('showFilters') === 'true';
+  const [showSortMenu, setShowSortMenu] = useState(false);
 
-  const [sortBy, setSortBy] = useState<SortOption>('default');
-  const [showFilters, setShowFilters] = useState(false);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const updateFilters = (newSort: SortOption, newTags: string[], newShow: boolean) => {
+    const params = new URLSearchParams(searchParams.toString());
+    
+    if (newSort === 'default') params.delete('sort');
+    else params.set('sort', newSort);
 
-  const toggleTag = (tag: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
-    );
+    if (newTags.length === 0) params.delete('tags');
+    else params.set('tags', newTags.join(','));
+
+    if (newShow) params.set('showFilters', 'true');
+    else params.delete('showFilters');
+
+    // router.replace ile URL değişse bile yeni bir geri tuşu sayfası eklemiyoruz, mevcut durumu düzenliyoruz.
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   };
 
-  const clearAllTags = () => setSelectedTags([]);
+  const handleSortChange = (val: SortOption) => {
+    setShowSortMenu(false);
+    updateFilters(val, selectedTags, showFilters);
+  };
+
+  const handleToggleTag = (tag: string) => {
+    let newTags: string[];
+    if (selectedTags.includes(tag)) {
+      newTags = selectedTags.filter((t) => t !== tag);
+    } else {
+      newTags = [...selectedTags, tag];
+    }
+    updateFilters(sortBy, newTags, showFilters);
+  };
+
+  const clearTags = () => {
+    updateFilters(sortBy, [], showFilters);
+  };
+  
+  const handleToggleFiltersPanel = () => {
+    updateFilters(sortBy, selectedTags, !showFilters);
+  };
+
+  /* ── Filtered + sorted products ────────────────────────────── */
 
   const filtered = useMemo(() => {
     let result = [...mockProducts];
 
-    // Search filter from URL query
     if (query.trim()) {
       const q = query.toLowerCase();
       result = result.filter(
         (p) =>
-          p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q),
+          p.name.toLowerCase().includes(q) ||
+          p.description.toLowerCase().includes(q) ||
+          (p.category && p.category.toLowerCase().includes(q)),
       );
     }
 
-    // Category tag filter
     if (selectedTags.length > 0) {
       result = result.filter((p) => {
-        const text = `${p.name} ${p.description}`.toLowerCase();
+        const text = `${p.name} ${p.description} ${p.category || ''}`.toLowerCase();
         return selectedTags.some((tag) => text.includes(tag.toLowerCase()));
       });
     }
 
-    // Sort
     switch (sortBy) {
       case 'price-asc':
         result.sort((a, b) => a.price - b.price);
@@ -102,7 +138,9 @@ function SearchContent() {
       {/* Page Header */}
       <div className="mb-6">
         <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
-          {query ? `"${query}" için sonuçlar` : 'Ürünleri Keşfet'}
+          {query
+            ? `"${query.charAt(0).toLocaleUpperCase('tr-TR') + query.slice(1)}" için sonuçlar`
+            : 'Ürünleri Keşfet'}
         </h1>
         <p className="mt-1 text-base text-slate-500">
           {filtered.length} ürün listeleniyor
@@ -110,10 +148,10 @@ function SearchContent() {
       </div>
 
       {/* Filter & Sort Bar */}
-      <div className="mb-6 flex items-center justify-between gap-4">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <button
           id="filter-toggle"
-          onClick={() => setShowFilters(!showFilters)}
+          onClick={handleToggleFiltersPanel}
           className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-all ${
             showFilters || selectedTags.length > 0
               ? 'border-indigo-200 bg-indigo-50 text-indigo-600'
@@ -129,31 +167,57 @@ function SearchContent() {
           )}
         </button>
 
+        {/* CUSTOM DROPDOWN TO FIX BROWSER SELECT BUGS AND IMPROVE UI */}
         <div className="relative">
-          <select
-            id="sort-select"
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as SortOption)}
-            className="cursor-pointer appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-4 pr-10 text-sm font-semibold text-slate-700 outline-none transition-all hover:border-indigo-200 focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100"
+          <button
+            onClick={() => setShowSortMenu(!showSortMenu)}
+            className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold shadow-[0_2px_8px_-4px_rgba(0,0,0,0.05)] transition-all focus:outline-none focus:ring-2 focus:ring-indigo-100 ${
+              sortBy !== 'default' || showSortMenu
+                ? 'border-indigo-200 bg-indigo-50 text-indigo-600 hover:border-indigo-300'
+                : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:text-indigo-600 focus:border-indigo-500'
+            }`}
           >
-            {Object.entries(sortLabels).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+            {sortLabels[sortBy]}
+            <ChevronDown className={`h-4 w-4 transition-transform ${
+              showSortMenu ? 'rotate-180 text-indigo-600' : (sortBy !== 'default' ? 'text-indigo-600' : 'text-slate-500')
+            }`} />
+          </button>
+          
+          {showSortMenu && (
+            <>
+              {/* Invisible backdrop to click away */}
+              <div 
+                className="fixed inset-0 z-10" 
+                onClick={() => setShowSortMenu(false)} 
+              />
+              <div className="absolute right-0 z-20 mt-2 w-56 origin-top-right overflow-hidden rounded-2xl border border-slate-200 bg-white py-1.5 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.08)] animate-in fade-in zoom-in-95 duration-200">
+                {Object.entries(sortLabels).map(([value, label]) => (
+                  <button
+                    key={value}
+                    onClick={() => handleSortChange(value as SortOption)}
+                    className={`block w-full px-4 py-2.5 text-left text-sm font-medium transition-colors ${
+                      sortBy === value 
+                        ? 'bg-indigo-600 text-white font-bold shadow-md shadow-indigo-200' 
+                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
       {/* Filter Panel (collapsible) */}
-      {showFilters && (
+      {(showFilters || selectedTags.length > 0) && (
         <div className="mb-8 rounded-2xl border border-slate-100 bg-white p-6 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm font-bold text-slate-700">Kategoriler</span>
             {selectedTags.length > 0 && (
               <button
-                onClick={clearAllTags}
+                onClick={clearTags}
                 className="flex items-center gap-1 text-xs font-semibold text-red-500 hover:text-red-600 transition-colors"
               >
                 <X className="h-3 w-3" />
@@ -167,7 +231,7 @@ function SearchContent() {
               return (
                 <button
                   key={tag}
-                  onClick={() => toggleTag(tag)}
+                  onClick={() => handleToggleTag(tag)}
                   className={`rounded-full border px-4 py-2 text-sm font-semibold transition-all active:scale-95 ${
                     isActive
                       ? 'border-indigo-400 bg-indigo-600 text-white shadow-md shadow-indigo-200'
@@ -188,16 +252,6 @@ function SearchContent() {
   );
 }
 
-/**
- * Reads the query param and passes it as a key to SearchContent.
- * When the key changes, React remounts the component, resetting all local state.
- */
-function SearchPageInner() {
-  const searchParams = useSearchParams();
-  const query = searchParams.get('q') || '';
-  return <SearchContent key={query} />;
-}
-
 export default function SearchPage() {
   return (
     <Suspense
@@ -207,7 +261,7 @@ export default function SearchPage() {
         </div>
       }
     >
-      <SearchPageInner />
+      <SearchContent />
     </Suspense>
   );
 }
