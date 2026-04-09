@@ -118,7 +118,7 @@ export default function Header() {
                     <p className="text-xs text-slate-400 truncate">{user.email}</p>
                   </div>
 
-                  {/* Hesap */}
+                  {/* Account */}
                   <Link
                     href="/account"
                     className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 transition-colors group/item"
@@ -132,7 +132,7 @@ export default function Header() {
                     </div>
                   </Link>
 
-                  {/* Siparişlerim */}
+                  {/* My Orders */}
                   <Link
                     href="/orders"
                     className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 transition-colors group/item"
