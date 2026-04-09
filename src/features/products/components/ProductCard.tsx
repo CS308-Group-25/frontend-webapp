@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import Link from 'next/link';
 import { Star } from 'lucide-react';
 import { Product } from '../types/product.types';
 import StockBadge from './StockBadge';
@@ -17,13 +18,12 @@ function RatingStars({ rating, reviewCount }: { rating: number; reviewCount: num
           return (
             <Star
               key={i}
-              className={`h-3.5 w-3.5 ${
-                filled
+              className={`h-3.5 w-3.5 ${filled
                   ? 'fill-amber-400 text-amber-400'
                   : half
                     ? 'fill-amber-400/50 text-amber-400'
                     : 'fill-slate-200 text-slate-200'
-              }`}
+                }`}
             />
           );
         })}
@@ -61,11 +61,11 @@ export default function ProductCard({ product }: ProductCardProps) {
   const isOutOfStock = product.stockStatus === 'out_of_stock';
 
   return (
-    <div
+    <Link
+      href={`/product/${product.id}`}
       id={`product-card-${product.id}`}
-      className={`group relative flex flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-indigo-500/10 ${
-        isOutOfStock ? 'opacity-75' : ''
-      }`}
+      className={`group relative flex flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-indigo-500/10 ${isOutOfStock ? 'opacity-75' : ''
+        }`}
     >
       {/* Badges */}
       {product.isNew && <NewBadge />}
@@ -80,9 +80,8 @@ export default function ProductCard({ product }: ProductCardProps) {
           alt={product.name}
           fill
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-          className={`object-contain p-4 transition-transform duration-500 group-hover:scale-110 ${
-            isOutOfStock ? 'grayscale' : ''
-          }`}
+          className={`object-contain p-4 transition-transform duration-500 group-hover:scale-110 ${isOutOfStock ? 'grayscale' : ''
+            }`}
         />
 
         {/* Hover Overlay */}
@@ -125,6 +124,6 @@ export default function ProductCard({ product }: ProductCardProps) {
           <StockBadge status={product.stockStatus} count={product.stockCount} />
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
