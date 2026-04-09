@@ -8,6 +8,7 @@ import { Mail, Lock, Loader2 } from 'lucide-react';
 import { loginSchema, LoginFormValues } from '../schemas/login.schema';
 import { loginUser } from '../api/auth.api';
 import { useAuthStore } from '../store/auth.store';
+import { useCartStore } from '@/features/cart';
 
 export default function LoginForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -29,6 +30,8 @@ export default function LoginForm() {
     try {
       const user = await loginUser(data);
       useAuthStore.getState().setUser(user);
+      // Trigger cart merge after login
+      useCartStore.getState().mergeWithServer();
       router.push('/');
     } catch (err) {
       setApiError(
