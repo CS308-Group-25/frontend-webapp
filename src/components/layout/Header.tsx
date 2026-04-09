@@ -12,8 +12,10 @@ import {
   UserCog,
   Package,
   Search,
+  ShoppingCart,
 } from 'lucide-react';
 import { useAuthStore } from '@/features/auth/store/auth.store';
+import { useCartStore } from '@/features/cart';
 import { logoutUser } from '@/features/auth/api/auth.api';
 
 const categories = [
@@ -28,8 +30,11 @@ const categories = [
 
 export default function Header() {
   const { user, isAuthenticated, isLoading } = useAuthStore();
+  const cartItems = useCartStore((state) => state.items);
   const router = useRouter();
   const [searchValue, setSearchValue] = useState('');
+
+  const itemCount = cartItems.reduce((total, item) => total + item.quantity, 0);
 
   const handleLogout = async () => {
     try {
@@ -89,7 +94,22 @@ export default function Header() {
         </form>
         
         {/* Navigation / Actions */}
-        <div className="flex items-center gap-4 shrink-0 ml-auto">
+        <div className="flex items-center gap-2 sm:gap-4 shrink-0 ml-auto">
+          {/* Cart Icon */}
+          <Link
+            href="/cart"
+            className="relative flex items-center gap-2 px-3 py-2 rounded-xl text-slate-700 transition-all hover:bg-slate-50 hover:text-indigo-600 group"
+          >
+            <div className="relative">
+              <ShoppingCart className="w-5 h-5 transition-transform group-hover:scale-110" />
+              {itemCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-indigo-600 px-1 text-[10px] font-bold text-white shadow-sm ring-2 ring-white transition-all group-hover:bg-indigo-700">
+                  {itemCount}
+                </span>
+              )}
+            </div>
+            <span className="hidden md:inline text-sm font-bold uppercase tracking-tight">Sepet</span>
+          </Link>
 
           {/* Show skeleton while loading */}
           {isLoading ? (
