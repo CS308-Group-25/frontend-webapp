@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useAuthStore } from '../store/auth.store';
 import { fetchCurrentUser } from '../api/auth.api';
+import { useCartStore } from '@/features/cart';
 
 /**
  * AuthInitializer
@@ -25,6 +26,12 @@ export default function AuthInitializer() {
       try {
         const user = await fetchCurrentUser();
         useAuthStore.getState().setUser(user);
+        
+        // Trigger cart merge if there are guest items
+        const { items, mergeWithServer } = useCartStore.getState();
+        if (items.length > 0) {
+          mergeWithServer();
+        }
       } catch {
         // 401 or network error — user is not authenticated
         useAuthStore.getState().clearUser();
