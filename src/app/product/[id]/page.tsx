@@ -313,7 +313,7 @@ export default function ProductDetailPage(props: { params: Promise<{ id: string 
                 </span>
               )}
               {product.stockStatus && (
-                <StockBadge status={product.stockStatus as any} count={product.stockCount} />
+                <StockBadge status={product.stockStatus} count={product.stockCount} />
               )}
             </div>
           </div>
