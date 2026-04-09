@@ -11,6 +11,7 @@ import SizeSelector from '@/features/products/components/SizeSelector';
 import QuantitySelector from '@/features/products/components/QuantitySelector';
 import AddToCartButton from '@/features/products/components/AddToCartButton';
 import ProductAccordion from '@/features/products/components/ProductAccordion';
+import StockBadge from '@/features/products/components/StockBadge';
 
 
 /* ──────────────────────── Tag Badge Mapping ──────────────────────── */
@@ -57,6 +58,7 @@ export default function ProductDetailPage(props: { params: Promise<{ id: string 
   const params = use(props.params);
   const router = useRouter();
   const product = mockProducts.find((p) => p.id === params.id);
+  const isOutOfStock = product?.stockStatus === 'out_of_stock';
 
   /* ── State ────────────────────────────────────────────────────── */
 
@@ -288,7 +290,7 @@ export default function ProductDetailPage(props: { params: Promise<{ id: string 
           <div className="flex items-end justify-between">
             <div>
               <div className="flex items-baseline gap-3">
-                <span className="text-4xl font-extrabold text-slate-900">
+                <span className={`text-4xl font-extrabold ${isOutOfStock ? 'text-slate-400' : 'text-slate-900'}`}>
                   {displayPrice.toLocaleString('tr-TR')} TL
                 </span>
                 {displayOriginal && displayOriginal > displayPrice && (
@@ -310,23 +312,23 @@ export default function ProductDetailPage(props: { params: Promise<{ id: string 
                   %{discountPercent} İNDİRİM
                 </span>
               )}
-              {product.stockCount != null && (
-                <span className="text-xs font-medium text-slate-500">
-                  {product.stockCount} adet stokta
-                </span>
+              {product.stockStatus && (
+                <StockBadge status={product.stockStatus} count={product.stockCount} />
               )}
             </div>
           </div>
 
           {/* Quantity + Add to Cart */}
           <div className="flex items-center gap-4">
-            <QuantitySelector
-              quantity={quantity}
-              onChange={setQuantity}
-              max={product.stockCount || 99}
-            />
+            {!isOutOfStock && (
+              <QuantitySelector
+                quantity={quantity}
+                onChange={setQuantity}
+                max={product.stockCount || 99}
+              />
+            )}
             <div className="flex-1">
-              <AddToCartButton />
+              <AddToCartButton disabled={isOutOfStock} />
             </div>
           </div>
 
