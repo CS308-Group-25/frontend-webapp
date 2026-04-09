@@ -116,7 +116,7 @@ export default function AdminProductsPage() {
             >
               <option value="urgency">Stok Aciliyeti (Önerilen)</option>
               <option value="newest">En Yeni Eklenenler</option>
-              <option value="name_asc">İsim (A'dan Z'ye)</option>
+              <option value="name_asc">İsim (A&apos;dan Z&apos;ye)</option>
               <option value="price_asc">Fiyat (Düşükten Yükseğe)</option>
               <option value="price_desc">Fiyat (Yüksekten Düşüğe)</option>
               <option value="stock_desc">Stok (En Çok)</option>
