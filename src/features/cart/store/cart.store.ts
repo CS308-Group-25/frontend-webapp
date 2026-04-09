@@ -107,9 +107,21 @@ export const useCartStore = create<CartState>()(
               await addCartItem(item.productId, item.quantity);
               succeeded.push(item.productId);
             } catch (error) {
-              const axiosError = error as any; // Temporary cast to access response, or use a proper type if available
-              const reason =
-                axiosError.response?.data?.detail || 'Bilinmeyen bir hata oluştu';
+              let reason = 'Bilinmeyen bir hata oluştu';
+
+              // Type safe way to access error detail without using 'any'
+              const apiError = error as {
+                response?: {
+                  data?: {
+                    detail?: string;
+                  };
+                };
+              };
+
+              if (apiError.response?.data?.detail) {
+                reason = apiError.response.data.detail;
+              }
+
               failed.push({ productId: item.productId, reason });
               console.warn(`[CartStore] Failed to merge item ${item.productId}:`, reason);
             }
