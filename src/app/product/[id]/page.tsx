@@ -2,6 +2,7 @@
 
 import { use, useState, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ChevronRight, Star, Truck, ShieldCheck, Clock, Leaf, WheatOff, Package } from 'lucide-react';
 import { mockProducts } from '@/features/products/data/mock-products';
 import ProductImageGallery from '@/features/products/components/ProductImageGallery';
@@ -52,13 +53,10 @@ function RatingStars({ rating, reviewCount }: { rating: number; reviewCount: num
 
 /* ══════════════════════════ PAGE ══════════════════════════════════ */
 
-export default function ProductDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = use(params);
-  const product = mockProducts.find((p) => p.id === id);
+export default function ProductDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = use(props.params);
+  const router = useRouter();
+  const product = mockProducts.find((p) => p.id === params.id);
 
   /* ── State ────────────────────────────────────────────────────── */
 
@@ -177,20 +175,41 @@ export default function ProductDetailPage({
           Anasayfa
         </Link>
         <ChevronRight className="h-3.5 w-3.5" />
-        <Link href="/search" className="transition-colors hover:text-indigo-600">
+        <button
+          onClick={() => {
+            const lastQ = sessionStorage.getItem('lastSearchQuery');
+            // If we applied a filter while on "All Products" (lastQ is empty),
+            // use history.back() to ensure filters are preserved when returning.
+            // If we arrived from another category page, navigate cleanly to /search.
+            if (window.history.length > 2 && !lastQ) {
+              window.history.back();
+            } else {
+              router.push('/search');
+            }
+          }}
+          className="transition-colors hover:text-indigo-600 focus:outline-none"
+        >
           Tüm Ürünler
-        </Link>
+        </button>
         {product.category && (
           <>
             <ChevronRight className="h-3.5 w-3.5" />
             <button
               onClick={() => {
-                // If we didn't land on this page directly (i.e. there's history), go back.
-                // This Perfectly preserves the filters and URL parameters.
+                const lastQ = sessionStorage.getItem('lastSearchQuery');
                 if (window.history.length > 2) {
-                  window.history.back();
+                  // If lastQ is empty (arrived from "All Products" section),
+                  // navigate directly to a fresh `q=Category` search page
+                  // instead of returning to the previous `?tags=Category` state.
+                  if (!lastQ) {
+                    router.push(`/search?q=${encodeURIComponent(product.category!)}`);
+                  } else {
+                    // If arrived from a specific category where sub-filters (like 'Kreatin') were chosen,
+                    // use history.back() to prevent those filters from resetting.
+                    window.history.back();
+                  }
                 } else {
-                  window.location.href = `/search?q=${encodeURIComponent(product.category!)}`;
+                  router.push(`/search?q=${encodeURIComponent(product.category!)}`);
                 }
               }}
               className="transition-colors hover:text-indigo-600 focus:outline-none"

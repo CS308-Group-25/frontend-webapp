@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { SlidersHorizontal, ChevronDown, X } from 'lucide-react';
@@ -51,20 +51,24 @@ function SearchContent() {
   const sortBy = (searchParams.get('sort') || 'default') as SortOption;
   const tagsParam = searchParams.get('tags');
   const selectedTags = tagsParam ? tagsParam.split(',') : [];
-  const showFilters = searchParams.get('showFilters') === 'true';
+  const [showFiltersState, setShowFiltersState] = useState(() => selectedTags.length > 0);
   const [showSortMenu, setShowSortMenu] = useState(false);
 
-  const updateFilters = (newSort: SortOption, newTags: string[], newShow: boolean) => {
+  useEffect(() => {
+    sessionStorage.setItem('lastSearchQuery', query);
+  }, [query]);
+
+  const updateFilters = (newSort: SortOption, newTags: string[]) => {
     const params = new URLSearchParams(searchParams.toString());
     
+    // Clean up residual showFilters if it was previously set in the URL by older code
+    params.delete('showFilters');
+
     if (newSort === 'default') params.delete('sort');
     else params.set('sort', newSort);
 
     if (newTags.length === 0) params.delete('tags');
     else params.set('tags', newTags.join(','));
-
-    if (newShow) params.set('showFilters', 'true');
-    else params.delete('showFilters');
 
     // By using router.replace, we edit the current state instead of adding a new page to the history stack.
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
@@ -72,7 +76,7 @@ function SearchContent() {
 
   const handleSortChange = (val: SortOption) => {
     setShowSortMenu(false);
-    updateFilters(val, selectedTags, showFilters);
+    updateFilters(val, selectedTags);
   };
 
   const handleToggleTag = (tag: string) => {
@@ -82,15 +86,15 @@ function SearchContent() {
     } else {
       newTags = [...selectedTags, tag];
     }
-    updateFilters(sortBy, newTags, showFilters);
+    updateFilters(sortBy, newTags);
   };
 
   const clearTags = () => {
-    updateFilters(sortBy, [], showFilters);
+    updateFilters(sortBy, []);
   };
   
   const handleToggleFiltersPanel = () => {
-    updateFilters(sortBy, selectedTags, !showFilters);
+    setShowFiltersState((prev) => !prev);
   };
 
   /* ── Filtered + sorted products ────────────────────────────── */
@@ -149,7 +153,7 @@ function SearchContent() {
           id="filter-toggle"
           onClick={handleToggleFiltersPanel}
           className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-all ${
-            showFilters || selectedTags.length > 0
+            showFiltersState || selectedTags.length > 0
               ? 'border-indigo-200 bg-indigo-50 text-indigo-600'
               : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:text-indigo-600'
           }`}
@@ -207,7 +211,7 @@ function SearchContent() {
       </div>
 
       {/* Filter Panel (collapsible) */}
-      {(showFilters || selectedTags.length > 0) && (
+      {(showFiltersState || selectedTags.length > 0) && (
         <div className="mb-8 rounded-2xl border border-slate-100 bg-white p-6 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm font-bold text-slate-700">Kategoriler</span>
