@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState, useMemo, useEffect, useRef } from 'react';
+import { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { SlidersHorizontal, ChevronDown, X } from 'lucide-react';
@@ -45,8 +45,8 @@ function SearchContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   
-  // URL'yi tek bir merkezi "Doğru Kaynak" (Source of Truth) olarak kullanıyoruz.
-  // Bu yöntemle hataların oluşması teknik olarak imkansızdır.
+  // We use the URL as a single "Source of Truth".
+  // This technique makes it technically impossible for state mismatches to occur.
   const query = searchParams.get('q') || '';
   const sortBy = (searchParams.get('sort') || 'default') as SortOption;
   const tagsParam = searchParams.get('tags');
@@ -66,7 +66,7 @@ function SearchContent() {
     if (newShow) params.set('showFilters', 'true');
     else params.delete('showFilters');
 
-    // router.replace ile URL değişse bile yeni bir geri tuşu sayfası eklemiyoruz, mevcut durumu düzenliyoruz.
+    // By using router.replace, we edit the current state instead of adding a new page to the history stack.
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   };
 
@@ -95,43 +95,39 @@ function SearchContent() {
 
   /* ── Filtered + sorted products ────────────────────────────── */
 
-  const filtered = useMemo(() => {
-    let result = [...mockProducts];
+  let filtered = [...mockProducts];
 
-    if (query.trim()) {
-      const q = query.toLowerCase();
-      result = result.filter(
-        (p) =>
-          p.name.toLowerCase().includes(q) ||
-          p.description.toLowerCase().includes(q) ||
-          (p.category && p.category.toLowerCase().includes(q)),
-      );
-    }
+  if (query.trim()) {
+    const q = query.toLowerCase();
+    filtered = filtered.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        p.description.toLowerCase().includes(q) ||
+        (p.category && p.category.toLowerCase().includes(q)),
+    );
+  }
 
-    if (selectedTags.length > 0) {
-      result = result.filter((p) => {
-        const text = `${p.name} ${p.description} ${p.category || ''}`.toLowerCase();
-        return selectedTags.some((tag) => text.includes(tag.toLowerCase()));
-      });
-    }
+  if (selectedTags.length > 0) {
+    filtered = filtered.filter((p) => {
+      const text = `${p.name} ${p.description} ${p.category || ''}`.toLowerCase();
+      return selectedTags.some((tag) => text.includes(tag.toLowerCase()));
+    });
+  }
 
-    switch (sortBy) {
-      case 'price-asc':
-        result.sort((a, b) => a.price - b.price);
-        break;
-      case 'price-desc':
-        result.sort((a, b) => b.price - a.price);
-        break;
-      case 'rating':
-        result.sort((a, b) => b.rating - a.rating);
-        break;
-      case 'reviews':
-        result.sort((a, b) => b.reviewCount - a.reviewCount);
-        break;
-    }
-
-    return result;
-  }, [query, sortBy, selectedTags]);
+  switch (sortBy) {
+    case 'price-asc':
+      filtered.sort((a, b) => a.price - b.price);
+      break;
+    case 'price-desc':
+      filtered.sort((a, b) => b.price - a.price);
+      break;
+    case 'rating':
+      filtered.sort((a, b) => b.rating - a.rating);
+      break;
+    case 'reviews':
+      filtered.sort((a, b) => b.reviewCount - a.reviewCount);
+      break;
+  }
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">

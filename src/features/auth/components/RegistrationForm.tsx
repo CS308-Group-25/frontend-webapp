@@ -21,7 +21,7 @@ export default function RegistrationForm() {
     formState: { errors },
   } = useForm<RegistrationFormValues>({
     resolver: zodResolver(registrationSchema),
-    mode: 'onSubmit', // Sadece "Üye Ol" butonuna tıklandığında ilk hataları göster (Hibrit Akıllı Mod)
+    mode: 'onSubmit', // Only show initial errors when "Sign Up" button is clicked (Hybrid Smart Mode)
   });
 
   const onSubmit = async (data: RegistrationFormValues) => {

@@ -185,8 +185,8 @@ export default function ProductDetailPage({
             <ChevronRight className="h-3.5 w-3.5" />
             <button
               onClick={() => {
-                // Eğer doğrudan bu sayfaya gelmemişsek (başka sayfa geçmişi varsa), geri dön.
-                // Bu sayede filtreler ve URL parametreleri mükemmel şekilde korunur.
+                // If we didn't land on this page directly (i.e. there's history), go back.
+                // This Perfectly preserves the filters and URL parameters.
                 if (window.history.length > 2) {
                   window.history.back();
                 } else {
