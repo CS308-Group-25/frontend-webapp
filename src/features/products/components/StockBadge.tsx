@@ -6,7 +6,14 @@ interface StockBadgeProps {
 }
 
 export default function StockBadge({ status, count }: StockBadgeProps) {
-  if (status === 'in_stock') return null;
+  if (status === 'in_stock') {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200/60">
+        <span className="h-2 w-2 rounded-full bg-emerald-500" />
+        Stokta {count ? `${count} adet` : 'Var'}
+      </span>
+    );
+  }
 
   if (status === 'low_stock') {
     return (

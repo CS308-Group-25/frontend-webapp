@@ -4,14 +4,16 @@ import { use, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ChevronRight, Star, Truck, ShieldCheck, Clock, Leaf, WheatOff, Package } from 'lucide-react';
-import { mockProducts } from '@/features/products/data/mock-products';
-import ProductImageGallery from '@/features/products/components/ProductImageGallery';
-import FlavorSelector from '@/features/products/components/FlavorSelector';
-import SizeSelector from '@/features/products/components/SizeSelector';
-import QuantitySelector from '@/features/products/components/QuantitySelector';
-import AddToCartButton from '@/features/products/components/AddToCartButton';
-import ProductAccordion from '@/features/products/components/ProductAccordion';
-import StockBadge from '@/features/products/components/StockBadge';
+import {
+  mockProducts,
+  ProductImageGallery,
+  FlavorSelector,
+  SizeSelector,
+  QuantitySelector,
+  AddToCartButton,
+  ProductAccordion,
+  StockBadge
+} from '@/features/products';
 
 
 /* ──────────────────────── Tag Badge Mapping ──────────────────────── */
@@ -328,7 +330,12 @@ export default function ProductDetailPage(props: { params: Promise<{ id: string 
               />
             )}
             <div className="flex-1">
-              <AddToCartButton disabled={isOutOfStock} />
+              <AddToCartButton 
+                productId={product.id}
+                quantity={quantity}
+                variantId={selectedSize}
+                disabled={isOutOfStock} 
+              />
             </div>
           </div>
 

@@ -3,7 +3,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Toaster } from 'sonner';
-import AuthInitializer from '@/features/auth/components/AuthInitializer';
+import { AuthInitializer } from '@/features/auth';
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   // Creating a new QueryClient per session/render cycle

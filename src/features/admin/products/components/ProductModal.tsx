@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import type { Product, ProductFlavor, ProductSize } from '@/features/products/types/product.types';
+import type { Product, ProductFlavor, ProductSize } from '@/features/products';
 
 interface ProductModalProps {
   isOpen: boolean;

@@ -26,11 +26,14 @@ export default function AuthInitializer() {
       try {
         const user = await fetchCurrentUser();
         useAuthStore.getState().setUser(user);
-        
+
         // Trigger cart merge if there are guest items
-        const { items, mergeWithServer } = useCartStore.getState();
+        const { items, mergeWithServer, fetchServerCart } = useCartStore.getState();
         if (items.length > 0) {
           mergeWithServer();
+        } else {
+          // If no guest items to merge, simply load the server cart
+          fetchServerCart();
         }
       } catch {
         // 401 or network error — user is not authenticated
