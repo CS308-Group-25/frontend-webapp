@@ -1,34 +1,25 @@
 import apiClient from '@/lib/api-client';
 
 export interface CreateOrderPayload {
-  address: {
-    first_name: string;
-    last_name: string;
-    address_line1: string;
-    address_line2?: string;
-    city: string;
-    district: string;
-    phone: string;
-    save_address?: boolean;
-    title?: string;
-  };
-  payment_method: 'credit_card' | 'cod_cash' | 'cod_card';
-  card_details?: {
-    card_number: string;
-    card_holder: string;
-    expiry_month: string;
-    expiry_year: string;
-    cvv: string;
-  };
-  billing_address_same_as_shipping: boolean;
+  delivery_address: string;
+  card_number: string;
+  card_last4: string;
+  card_brand: string;
 }
 
 export interface CreateOrderResponse {
   id: number;
-  order_number: string;
   status: string;
+  total: number;
+  invoice_id: number | null;
+  items: Array<{
+    product_id: number;
+    name: string;
+    quantity: number;
+    price: number;
+  }>;
+  delivery_address: string;
   created_at: string;
-  total_amount: number;
 }
 
 export const createOrder = async (

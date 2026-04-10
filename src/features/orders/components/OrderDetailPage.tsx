@@ -9,7 +9,6 @@ import {
   Loader2,
   ChevronDown,
   Package,
-  CreditCard,
   MapPin,
 } from 'lucide-react';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
@@ -37,19 +36,10 @@ function formatTurkishDate(dateStr: string) {
   }
 }
 
-function getPaymentMethodLabel(method: string) {
-  const map: Record<string, string> = {
-    credit_card: 'Kredi Kartı',
-    cod_cash: 'Kapıda Ödeme (Nakit)',
-    cod_card: 'Kapıda Ödeme (Kredi Kartı)',
-  };
-  return map[method] ?? method;
-}
-
 function OrderItemRow({ item }: { item: OrderItem }) {
   const product = mockProducts.find((p) => p.id === String(item.product_id));
-  const imageSrc = product?.image ?? item.product_image ?? '/placeholder.png';
-  const name = product?.name ?? item.product_name;
+  const imageSrc = product?.image ?? '/placeholder.png';
+  const name = product?.name ?? item.name;
 
   return (
     <div className="flex items-start gap-3">
@@ -74,10 +64,7 @@ function OrderItemRow({ item }: { item: OrderItem }) {
         </p>
       </div>
       <div className="text-right shrink-0">
-        {item.original_price && (
-          <p className="text-xs text-slate-400 line-through">{item.original_price} TL</p>
-        )}
-        <p className="text-sm font-bold text-slate-900">{item.unit_price * item.quantity} TL</p>
+        <p className="text-sm font-bold text-slate-900">{item.price * item.quantity} TL</p>
       </div>
     </div>
   );
@@ -125,7 +112,7 @@ export default function OrderDetailPage({ orderId, isNewOrder }: OrderDetailPage
 
   const totalItems = order?.items.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
   const taxAmount = order
-    ? parseFloat((order.total_amount * 0.01 / 1.01).toFixed(2))
+    ? parseFloat((order.total * 0.01 / 1.01).toFixed(2))
     : 0;
 
   return (
@@ -185,7 +172,7 @@ export default function OrderDetailPage({ orderId, isNewOrder }: OrderDetailPage
                 <div className="bg-white rounded-2xl border border-slate-100 p-5 flex flex-col gap-1.5">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-slate-500 font-medium">Sipariş No</span>
-                    <span className="font-bold text-slate-800">#{order.order_number}</span>
+                    <span className="font-bold text-slate-800">#{order.id}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-slate-500 font-medium">Sipariş Tarihi</span>
@@ -194,65 +181,17 @@ export default function OrderDetailPage({ orderId, isNewOrder }: OrderDetailPage
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-slate-500 font-medium">Sipariş Tutarı</span>
                     <span className="font-bold text-slate-800">
-                      {order.total_amount} TL / {totalItems} ürün
+                      {order.total} TL / {totalItems} ürün
                     </span>
                   </div>
                 </div>
-
-                {/* Payment Summary */}
-                <CollapsibleSection
-                  title="Ödeme Özeti"
-                  icon={<CreditCard className="w-4 h-4 text-slate-500" />}
-                >
-                  <div className="flex flex-col gap-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Ödeme Yöntemi</span>
-                      <span className="font-semibold text-slate-800">
-                        {getPaymentMethodLabel(order.payment_method)}
-                      </span>
-                    </div>
-                    {order.last_four_digits && (
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">Kart</span>
-                        <span className="font-semibold text-slate-800 flex items-center gap-1">
-                          <span className="text-slate-400">••••</span> {order.last_four_digits}
-                        </span>
-                      </div>
-                    )}
-                    <div className="pt-2 border-t border-slate-100 flex justify-between">
-                      <span className="font-bold text-slate-700">Toplam</span>
-                      <span className="font-bold text-slate-900">{order.total_amount} TL</span>
-                    </div>
-                    {order.billing_address && (
-                      <div className="pt-2 border-t border-slate-100">
-                        <p className="text-slate-500 mb-1 font-medium">Fatura Adresi</p>
-                        <p className="text-slate-700">{order.billing_address.name}</p>
-                        <p className="text-slate-500">{order.billing_address.address_line1}</p>
-                        <p className="text-slate-500">
-                          {order.billing_address.district}/{order.billing_address.city}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </CollapsibleSection>
 
                 {/* Shipping Summary */}
                 <CollapsibleSection
                   title="Teslimat Özeti"
                   icon={<MapPin className="w-4 h-4 text-slate-500" />}
                 >
-                  <div className="text-sm">
-                    <p className="font-semibold text-slate-800">{order.shipping_address.name}</p>
-                    <p className="text-slate-500">{order.shipping_address.phone}</p>
-                    <p className="text-slate-500 mt-1">{order.shipping_address.address_line1}</p>
-                    {order.shipping_address.address_line2 && (
-                      <p className="text-slate-500">{order.shipping_address.address_line2}</p>
-                    )}
-                    <p className="text-slate-500">
-                      {order.shipping_address.district}/{order.shipping_address.city}
-                      {order.shipping_address.country && `, ${order.shipping_address.country}`}
-                    </p>
-                  </div>
+                  <p className="text-sm text-slate-700">{order.delivery_address}</p>
                 </CollapsibleSection>
 
                 {/* Footer actions */}
@@ -275,26 +214,14 @@ export default function OrderDetailPage({ orderId, isNewOrder }: OrderDetailPage
               {/* Right: Order Summary Panel */}
               <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 sticky top-24">
                 <div className="flex flex-col gap-4 pb-4 border-b border-slate-100">
-                  {order.items.map((item) => (
-                    <OrderItemRow key={item.id} item={item} />
+                  {order.items.map((item, index) => (
+                    <OrderItemRow key={`${item.product_id}-${index}`} item={item} />
                   ))}
-                </div>
-                <div className="py-4 border-b border-slate-100 flex flex-col gap-3">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-500 font-medium">Ara Toplam</span>
-                    <span className="font-semibold text-slate-800">{order.subtotal_amount} TL</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-500 font-medium">Teslimat / Kargo</span>
-                    <span className={`font-semibold ${order.shipping_cost === 0 ? 'text-green-600' : 'text-slate-800'}`}>
-                      {order.shipping_cost === 0 ? 'Ücretsiz' : `${order.shipping_cost} TL`}
-                    </span>
-                  </div>
                 </div>
                 <div className="pt-4 flex items-center justify-between">
                   <span className="text-lg font-black text-slate-900">Toplam</span>
                   <div className="text-right">
-                    <p className="text-xl font-black text-slate-900">{order.total_amount} TL</p>
+                    <p className="text-xl font-black text-slate-900">{order.total} TL</p>
                     <p className="text-xs text-slate-400 font-medium">Vergi {taxAmount} TL</p>
                   </div>
                 </div>

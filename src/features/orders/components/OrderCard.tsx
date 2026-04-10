@@ -30,14 +30,11 @@ export default function OrderCard({ order }: OrderCardProps) {
   // Try to get a product image for the first item
   const firstItem = order.items[0];
   const productImage = firstItem
-    ? mockProducts.find((p) => p.id === String(firstItem.product_id))?.image ??
-      firstItem.product_image ??
-      null
+    ? mockProducts.find((p) => p.id === String(firstItem.product_id))?.image ?? null
     : null;
 
   const firstItemName = firstItem
-    ? mockProducts.find((p) => p.id === String(firstItem.product_id))?.name ??
-      firstItem.product_name
+    ? mockProducts.find((p) => p.id === String(firstItem.product_id))?.name ?? firstItem.name
     : '';
 
   return (
@@ -74,13 +71,13 @@ export default function OrderCard({ order }: OrderCardProps) {
           {formatTurkishDate(order.created_at)} Tarihinde Sipariş Verildi
         </p>
         <p className="text-xs text-slate-400">
-          {order.order_number} numaralı sipariş
+          #{order.id} numaralı sipariş
         </p>
       </div>
 
       {/* Total */}
       <div className="text-right shrink-0">
-        <p className="font-black text-slate-900">{order.total_amount} TL</p>
+        <p className="font-black text-slate-900">{order.total} TL</p>
         <p className="text-xs text-slate-400">{totalItems} ürün</p>
       </div>
 

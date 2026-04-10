@@ -17,7 +17,6 @@ interface PaymentStepProps {
   onSubmit: (data: {
     method: PaymentMethod;
     cardDetails?: CreditCardFormValues;
-    billingAddressSameAsShipping: boolean;
   }) => Promise<void>;
   isSubmitting: boolean;
 }
@@ -76,7 +75,6 @@ export default function PaymentStep({
     await onSubmit({
       method: paymentMethod,
       cardDetails: cardData,
-      billingAddressSameAsShipping,
     });
   };
 

@@ -14,6 +14,13 @@ import { CheckoutStep, AddressFormData, PaymentMethod } from '../types';
 import { createOrder, CreateOrderPayload } from '../api';
 import { CreditCardFormValues } from '../schemas';
 
+function detectCardBrand(cardNumber: string): string {
+  if (cardNumber.startsWith('4')) return 'Visa';
+  if (cardNumber.startsWith('5')) return 'Mastercard';
+  if (cardNumber.startsWith('3')) return 'Amex';
+  return 'Unknown';
+}
+
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, clearCart } = useCartStore();
@@ -36,42 +43,35 @@ export default function CheckoutPage() {
   const handleOrderSubmit = async ({
     method,
     cardDetails,
-    billingAddressSameAsShipping,
   }: {
     method: PaymentMethod;
     cardDetails?: CreditCardFormValues;
-    billingAddressSameAsShipping: boolean;
   }) => {
     if (!addressData) return;
 
     setIsSubmitting(true);
     try {
-      const payload: CreateOrderPayload = {
-        address: {
-          first_name: addressData.firstName,
-          last_name: addressData.lastName,
-          address_line1: addressData.address,
-          address_line2: addressData.apartment || undefined,
-          city: addressData.city,
-          district: addressData.district,
-          phone: addressData.phone,
-          save_address: addressData.saveAddress,
-          title: addressData.title || undefined,
-        },
-        payment_method: method,
-        billing_address_same_as_shipping: billingAddressSameAsShipping,
-      };
+      const deliveryAddress = [
+        `${addressData.firstName} ${addressData.lastName}`,
+        addressData.address,
+        addressData.apartment || null,
+        `${addressData.district}/${addressData.city}`,
+        addressData.phone,
+      ]
+        .filter(Boolean)
+        .join(', ');
 
-      if (method === 'credit_card' && cardDetails) {
-        const [expiryMonth, expiryYear] = cardDetails.expiry.split('/');
-        payload.card_details = {
-          card_number: cardDetails.cardNumber.replace(/\s/g, ''),
-          card_holder: cardDetails.cardHolder,
-          expiry_month: expiryMonth,
-          expiry_year: expiryYear,
-          cvv: cardDetails.cvv,
-        };
-      }
+      const rawCardNumber =
+        method === 'credit_card' && cardDetails
+          ? cardDetails.cardNumber.replace(/\s/g, '')
+          : '';
+
+      const payload: CreateOrderPayload = {
+        delivery_address: deliveryAddress,
+        card_number: rawCardNumber,
+        card_last4: rawCardNumber.slice(-4),
+        card_brand: rawCardNumber ? detectCardBrand(rawCardNumber) : '',
+      };
 
       const order = await createOrder(payload);
       clearCart();
