@@ -1,4 +1,4 @@
-import AuthWidget from '@/features/auth/components/AuthWidget';
+import { AuthWidget } from '@/features/auth';
 
 export default function RegisterPage() {
   return <AuthWidget initialTab="register" />;

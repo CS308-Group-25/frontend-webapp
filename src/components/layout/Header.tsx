@@ -14,9 +14,8 @@ import {
   Search,
   ShoppingCart,
 } from 'lucide-react';
-import { useAuthStore } from '@/features/auth/store/auth.store';
-import { useCartStore } from '@/features/cart';
-import { logoutUser } from '@/features/auth/api/auth.api';
+import { useAuthStore, logoutUser } from '@/features/auth';
+import { useCartStore, CartDrawer } from '@/features/cart';
 
 const categories = [
   { label: 'Protein', href: '/search?q=protein' },
@@ -30,7 +29,7 @@ const categories = [
 
 export default function Header() {
   const { user, isAuthenticated, isLoading } = useAuthStore();
-  const cartItems = useCartStore((state) => state.items);
+  const { items: cartItems, openDrawer } = useCartStore();
   const router = useRouter();
   const [searchValue, setSearchValue] = useState('');
 
@@ -92,12 +91,12 @@ export default function Header() {
             Ara
           </button>
         </form>
-        
+
         {/* Navigation / Actions */}
         <div className="flex items-center gap-2 sm:gap-4 shrink-0 ml-auto">
           {/* Cart Icon */}
-          <Link
-            href="/cart"
+          <button
+            onClick={openDrawer}
             className="relative flex items-center gap-2 px-3 py-2 rounded-xl text-slate-700 transition-all hover:bg-slate-50 hover:text-indigo-600 group"
           >
             <div className="relative">
@@ -109,7 +108,7 @@ export default function Header() {
               )}
             </div>
             <span className="hidden md:inline text-sm font-bold uppercase tracking-tight">Sepet</span>
-          </Link>
+          </button>
 
           {/* Show skeleton while loading */}
           {isLoading ? (
@@ -198,8 +197,8 @@ export default function Header() {
               {/* Dropdown Menu (Hover Triggered) */}
               <div className="absolute right-0 top-full pt-2 w-56 opacity-0 translate-y-2 invisible group-hover:opacity-100 group-hover:translate-y-0 group-hover:visible transition-all duration-300 z-50">
                 <div className="bg-white rounded-2xl border border-slate-100 shadow-2xl shadow-indigo-500/10 overflow-hidden p-1.5 flex flex-col gap-1">
-                  <Link 
-                    href="/auth/register" 
+                  <Link
+                    href="/auth/register"
                     className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 transition-colors group/item"
                   >
                     <div className="p-2 bg-slate-50 rounded-lg group-hover/item:bg-indigo-100 transition-colors">
@@ -210,11 +209,11 @@ export default function Header() {
                       <span className="text-[10px] text-slate-400 font-medium tracking-tight">Üyeliğini başlat</span>
                     </div>
                   </Link>
-                  
+
                   <div className="h-px bg-slate-100 mx-2" />
 
-                  <Link 
-                    href="/auth/login" 
+                  <Link
+                    href="/auth/login"
                     className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 transition-colors group/item"
                   >
                     <div className="p-2 bg-slate-50 rounded-lg group-hover/item:bg-indigo-100 transition-colors">
@@ -275,6 +274,9 @@ export default function Header() {
           </div>
         </div>
       </nav>
+
+      <CartDrawer />
     </header>
   );
 }
+

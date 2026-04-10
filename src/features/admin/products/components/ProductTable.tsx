@@ -1,6 +1,5 @@
 import { Edit, Trash2, Star } from 'lucide-react';
-import type { Product } from '@/features/products/types/product.types';
-import StockBadge from '@/features/products/components/StockBadge';
+import { Product, StockBadge } from '@/features/products';
 import Image from 'next/image';
 
 interface ProductTableProps {

@@ -2,8 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { PackagePlus, ArrowDownUp } from 'lucide-react';
-import { mockProducts } from '@/features/products/data/mock-products';
-import type { Product } from '@/features/products/types/product.types';
+import { mockProducts, Product } from '@/features/products';
 import ProductTable from '@/features/admin/products/components/ProductTable';
 import ProductModal from '@/features/admin/products/components/ProductModal';
 import Link from 'next/link';

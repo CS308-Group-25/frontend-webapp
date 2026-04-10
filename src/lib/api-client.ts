@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { useAuthStore } from '@/features/auth/store/auth.store';
+import { useAuthStore } from '@/features/auth';
 
 /**
  * Centralized Axios API Client instance.

@@ -4,8 +4,7 @@ import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { SlidersHorizontal, ChevronDown, X } from 'lucide-react';
-import { mockProducts } from '@/features/products/data/mock-products';
-import ProductGrid from '@/features/products/components/ProductGrid';
+import { mockProducts, ProductGrid } from '@/features/products';
 
 type SortOption = 'default' | 'price-asc' | 'price-desc' | 'rating' | 'reviews';
 
