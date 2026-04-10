@@ -8,7 +8,6 @@ import { useReviewStore, ReviewModal } from '@/features/reviews';
 
 interface OrderProductRowProps {
   orderId: string;
-  orderNumber: string;
   orderStatus: OrderStatus;
   userId: string;
   item: {
