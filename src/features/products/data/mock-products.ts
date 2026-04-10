@@ -308,4 +308,41 @@ export const mockProducts: Product[] = [
     usage:
       '1 ölçek kaşığı (30g) 250ml süt veya su ile karıştırınız. Yatmadan 30 dakika önce tüketiniz.',
   },
+  {
+    id: '9',
+    name: 'Turkesterone Complex',
+    description: 'Bitkisel anabolik adaptör — kas ve güç desteği',
+    price: 749,
+    originalPrice: 999,
+    image: '/products/creatine.png',
+    images: ['/products/creatine.png'],
+    rating: 4.5,
+    reviewCount: 312,
+    stockStatus: 'in_stock',
+    stockCount: 55,
+    isNew: true,
+    category: 'Spor Gıdaları',
+    tags: ['Vegan', 'Glutensiz'],
+    flavors: [
+      { id: 'unflavored-turk', name: 'Aromasız', color: '#E5E7EB' },
+    ],
+    sizes: [
+      { id: 's120-turk', label: '120 Kapsül', servings: 30, price: 749, originalPrice: 999 },
+      { id: 's240-turk', label: '240 Kapsül', servings: 60, price: 1399, originalPrice: 1998 },
+    ],
+    features: [
+      'Ajuga Turkestanica özütünden elde edilen %10 Turkesterone',
+      'Antrenmanda maksimum güç ve toparlanma',
+      'Kas proteini sentezini destekler',
+      'Katkı maddesi içermez',
+    ],
+    ingredients:
+      'Ajuga Turkestanica Ekstresi (%10 Turkesterone), Jelatin Kapsül, Magnezyum Stearat.',
+    nutritionFacts: [
+      { label: 'Enerji', perServing: '5 kcal' },
+      { label: 'Turkesterone', perServing: '500mg' },
+    ],
+    usage:
+      'Günde 4 kapsül, 2 antrenman öncesi 2 antrenman sonrası, bol su ile tüketiniz.',
+  },
 ];
