@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useAuthStore } from '../store/auth.store';
 import { fetchCurrentUser } from '../api/auth.api';
 import { useCartStore } from '@/features/cart';
+import { useWishlistStore } from '@/features/wishlist';
 
 /**
  * AuthInitializer
@@ -27,13 +28,20 @@ export default function AuthInitializer() {
         const user = await fetchCurrentUser();
         useAuthStore.getState().setUser(user);
 
-        // Trigger cart merge if there are guest items
-        const { items, mergeWithServer, fetchServerCart } = useCartStore.getState();
-        if (items.length > 0) {
-          mergeWithServer();
+        // Trigger cart merge/fetch
+        const { items: cartItems, mergeWithServer: cartMerge, fetchServerCart } = useCartStore.getState();
+        if (cartItems.length > 0) {
+          cartMerge();
         } else {
-          // If no guest items to merge, simply load the server cart
           fetchServerCart();
+        }
+
+        // Trigger wishlist merge/fetch in parallel
+        const { items: wishItems, mergeWithServer: wishMerge, fetchServerWishlist } = useWishlistStore.getState();
+        if (wishItems.length > 0) {
+          wishMerge();
+        } else {
+          fetchServerWishlist();
         }
       } catch {
         // 401 or network error — user is not authenticated

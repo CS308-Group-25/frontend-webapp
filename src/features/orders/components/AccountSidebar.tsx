@@ -16,7 +16,7 @@ const NAV_ITEMS = [
   { href: '/orders', label: 'Siparişlerim', icon: Package },
   { href: '/account/addresses', label: 'Adreslerim', icon: MapPin },
   { href: '/account/draws', label: 'Çekilişlerim', icon: Gift },
-  { href: '/account/favorites', label: 'Favorilerim', icon: Heart },
+  { href: '/wishlist', label: 'Favorilerim', icon: Heart },
 ];
 
 export default function AccountSidebar() {

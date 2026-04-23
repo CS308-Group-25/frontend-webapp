@@ -13,9 +13,11 @@ import {
   Package,
   Search,
   ShoppingCart,
+  Heart,
 } from 'lucide-react';
 import { useAuthStore, logoutUser } from '@/features/auth';
 import { useCartStore, CartDrawer } from '@/features/cart';
+import { useWishlistStore } from '@/features/wishlist';
 
 const categories = [
   { label: 'Protein', href: '/search?q=protein' },
@@ -30,6 +32,7 @@ const categories = [
 export default function Header() {
   const { user, isAuthenticated, isLoading } = useAuthStore();
   const { items: cartItems, openDrawer } = useCartStore();
+  const { items: wishlistItems } = useWishlistStore();
   const router = useRouter();
   const [searchValue, setSearchValue] = useState('');
 
@@ -94,6 +97,24 @@ export default function Header() {
 
         {/* Navigation / Actions */}
         <div className="flex items-center gap-2 sm:gap-4 shrink-0 ml-auto">
+          {/* Wishlist Icon */}
+          <Link
+            href="/wishlist"
+            id="header-wishlist-link"
+            aria-label="Favorilerim"
+            className="relative flex items-center gap-2 px-3 py-2 rounded-xl text-slate-700 transition-all hover:bg-slate-50 hover:text-red-500 group"
+          >
+            <div className="relative">
+              <Heart className="w-5 h-5 transition-transform group-hover:scale-110" />
+              {wishlistItems.length > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white shadow-sm ring-2 ring-white transition-all group-hover:bg-red-600">
+                  {wishlistItems.length}
+                </span>
+              )}
+            </div>
+            <span className="hidden md:inline text-sm font-bold uppercase tracking-tight">Favoriler</span>
+          </Link>
+
           {/* Cart Icon */}
           <button
             onClick={openDrawer}
@@ -162,6 +183,22 @@ export default function Header() {
                     <div className="flex flex-col text-left">
                       <span className="text-sm font-bold">Siparişlerim</span>
                       <span className="text-[10px] text-slate-400 font-medium tracking-tight">Sipariş takibi</span>
+                    </div>
+                  </Link>
+
+                  {/* Wishlist */}
+                  <Link
+                    href="/wishlist"
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-50 text-slate-700 hover:text-red-500 transition-colors group/item"
+                  >
+                    <div className="p-2 bg-slate-50 rounded-lg group-hover/item:bg-red-100 transition-colors">
+                      <Heart className="w-4 h-4" />
+                    </div>
+                    <div className="flex flex-col text-left">
+                      <span className="text-sm font-bold">Favorilerim</span>
+                      <span className="text-[10px] text-slate-400 font-medium tracking-tight">
+                        {wishlistItems.length > 0 ? `${wishlistItems.length} ürün kaydedildi` : 'Kaydedilen ürünler'}
+                      </span>
                     </div>
                   </Link>
 
