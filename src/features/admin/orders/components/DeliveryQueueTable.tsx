@@ -1,14 +1,16 @@
 'use client';
 
-import { Eye } from 'lucide-react';
-import { AdminOrder } from '../types';
+import { useState } from 'react';
+import { Eye, ChevronDown } from 'lucide-react';
+import { AdminOrder, OrderStatus } from '../types';
 
 interface DeliveryQueueTableProps {
   orders: AdminOrder[];
   onViewOrder: (orderId: number) => void;
+  onUpdateStatus: (orderId: number, status: OrderStatus) => void;
 }
 
-export default function DeliveryQueueTable({ orders, onViewOrder }: DeliveryQueueTableProps) {
+export default function DeliveryQueueTable({ orders, onViewOrder, onUpdateStatus }: DeliveryQueueTableProps) {
   if (orders.length === 0) {
     return (
       <div className="flex min-h-[400px] flex-col items-center justify-center rounded-2xl bg-white p-8 shadow-sm">
@@ -73,13 +75,19 @@ export default function DeliveryQueueTable({ orders, onViewOrder }: DeliveryQueu
                   <StatusBadge status={order.status} />
                 </td>
                 <td className="px-6 py-4 text-right">
-                  <button
-                    onClick={() => onViewOrder(order.order_id)}
-                    className="rounded-lg p-2 text-indigo-600 transition-colors hover:bg-indigo-50 active:scale-95"
-                    title="Siparişi Görüntüle"
-                  >
-                    <Eye className="h-4 w-4" />
-                  </button>
+                  <div className="flex items-center justify-end gap-2">
+                    <StatusChangeDropdown
+                      currentStatus={order.status}
+                      onStatusChange={(status) => onUpdateStatus(order.order_id, status)}
+                    />
+                    <button
+                      onClick={() => onViewOrder(order.order_id)}
+                      className="rounded-lg p-2 text-indigo-600 transition-colors hover:bg-indigo-50 active:scale-95"
+                      title="Siparişi Görüntüle"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -104,5 +112,56 @@ function StatusBadge({ status }: { status: string }) {
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${className}`}>
       {label}
     </span>
+  );
+}
+
+const STATUS_OPTIONS: { value: OrderStatus; label: string }[] = [
+  { value: 'processing', label: 'Hazırlanıyor' },
+  { value: 'in_transit', label: 'Kargoya Verildi' },
+  { value: 'delivered', label: 'Teslim Edildi' },
+];
+
+function StatusChangeDropdown({
+  currentStatus,
+  onStatusChange,
+}: {
+  currentStatus: string;
+  onStatusChange: (status: OrderStatus) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handleSelect = (status: OrderStatus) => {
+    onStatusChange(status);
+    setIsOpen(false);
+  };
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+      >
+        Değiştir
+        <ChevronDown className="h-4 w-4" />
+      </button>
+
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
+          <div className="absolute right-0 top-full z-20 mt-1 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
+            {STATUS_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                onClick={() => handleSelect(option.value)}
+                disabled={currentStatus === option.value}
+                className="w-full px-4 py-2 text-left text-sm font-medium transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
