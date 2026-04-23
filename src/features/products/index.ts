@@ -1,4 +1,5 @@
 export * from './types/product.types';
+export * from './api/products.api';
 export * from './data/mock-products';
 export { default as ProductCard } from './components/ProductCard';
 export { default as AddToCartButton } from './components/AddToCartButton';

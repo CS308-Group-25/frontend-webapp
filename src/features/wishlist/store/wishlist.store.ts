@@ -54,12 +54,12 @@ export const useWishlistStore = create<WishlistState>()(
       mergeAttempted: false,
 
       // ─── Read ────────────────────────────────────────────────────────────
-      isInWishlist: (productId) => get().items.includes(productId),
+      isInWishlist: (productId) => get().items.some((id) => String(id) === String(productId)),
 
       // ─── Add ─────────────────────────────────────────────────────────────
       addItem: async (productId) => {
         const { items } = get();
-        if (items.includes(productId)) return; // already saved
+        if (items.some((id) => String(id) === String(productId))) return; // already saved
 
         const isAuth = useAuthStore.getState().isAuthenticated;
         const previousItems = [...items];
@@ -85,18 +85,28 @@ export const useWishlistStore = create<WishlistState>()(
         const previousItems = [...items];
 
         // Optimistic update
-        set({ items: items.filter((id) => id !== productId), mergeAttempted: false });
+        set({ items: items.filter((id) => String(id) !== String(productId)), mergeAttempted: false });
 
         if (isAuth) {
           try {
             await removeWishlistItem(productId);
           } catch (error) {
-            console.error('[WishlistStore] Failed to remove item:', error);
-            toast.error('Ürün favorilerden çıkarılamadı.');
-            set({ items: previousItems }); // rollback
+            // If the server says the item doesn't exist, the optimistic removal
+            // is already correct — keep local state as-is (don't rollback).
+            const errMsg = typeof error === 'string' ? error : '';
+            const isNotFound =
+              errMsg.toLowerCase().includes('not found') ||
+              errMsg.toLowerCase().includes('bulunamadı');
+
+            if (!isNotFound) {
+              console.error('[WishlistStore] Failed to remove item:', error);
+              toast.error('Ürün favorilerden çıkarılamadı.');
+              set({ items: previousItems }); // rollback only on real server errors
+            }
           }
         }
       },
+
 
       // ─── Toggle ──────────────────────────────────────────────────────────
       toggleItem: async (productId) => {
