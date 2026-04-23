@@ -150,7 +150,7 @@ const MOCK_INVOICES: Record<number, Invoice> = {
 
 export const fetchOrders = async (): Promise<Order[]> => {
   try {
-    const rawOrders = await apiClient.get('/v1/orders') as Record<string, any>[];
+    const rawOrders = await apiClient.get('/v1/orders') as Record<string, unknown>[];
     const backendOrders = Array.isArray(rawOrders) ? rawOrders : [];
     const allOrders = [...MOCK_ORDERS, ...backendOrders];
     
@@ -164,7 +164,8 @@ export const fetchOrders = async (): Promise<Order[]> => {
 
 // Helper to ensure all orders have consistent prices while preserving valid existing data
 const enrichOrder = (order: any): Order => { // eslint-disable-line @typescript-eslint/no-explicit-any
-  const items = ((order['items'] as any[]) || (order['order_items'] as any[]) || []).map((item) => {
+  const items = ((order['items'] as unknown[]) || (order['order_items'] as unknown[]) || []).map((itemRaw) => {
+    const item = itemRaw as Record<string, unknown>;
     const productId = String(item['product_id'] || item['id'] || 0);
     const product = mockProducts.find(p => p.id === productId);
     
@@ -225,13 +226,13 @@ export const fetchInvoice = async (orderId: string): Promise<Invoice> => {
   try {
     // 1. First attempt to get invoice from API
     try {
-      const apiInvoice = await apiClient.get(`/v1/orders/${orderId}/invoice`) as Record<string, any>;
+      const apiInvoice = await apiClient.get(`/v1/orders/${orderId}/invoice`) as Record<string, unknown>;
       // Strictly validate that we got a real invoice object with an ID and items
       if (apiInvoice && apiInvoice['invoice_id'] && Array.isArray(apiInvoice['items']) && apiInvoice['items'].length > 0) {
         return apiInvoice as unknown as Invoice;
       }
       console.warn(`API returned invalid or empty invoice for order ${orderId}, using fallback.`);
-    } catch (_) {
+    } catch {
       console.warn(`Invoice endpoint failed for order ${orderId}, using fallback.`);
     }
 
