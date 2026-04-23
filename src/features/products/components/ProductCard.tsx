@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Star } from 'lucide-react';
 import { Product } from '../types/product.types';
 import StockBadge from './StockBadge';
+import WishlistButton from '@/features/wishlist/components/WishlistButton';
 
 interface ProductCardProps {
   product: Product;
@@ -83,6 +84,11 @@ export default function ProductCard({ product }: ProductCardProps) {
           className={`object-contain p-4 transition-transform duration-500 group-hover:scale-110 ${isOutOfStock ? 'grayscale' : ''
             }`}
         />
+
+        {/* Wishlist Button */}
+        <div className="absolute bottom-3 right-3 z-10 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+          <WishlistButton productId={product.id} size="sm" />
+        </div>
 
         {/* Hover Overlay */}
         {!isOutOfStock && (
