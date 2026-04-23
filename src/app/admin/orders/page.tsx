@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { Truck } from 'lucide-react';
 import DeliveryQueueTable from '@/features/admin/orders/components/DeliveryQueueTable';
+import { fetchAdminOrders, updateOrderStatus } from '@/features/admin/orders/api';
 import { mockOrders, filterOrdersByStatus } from '@/features/admin/orders/data/mock-orders';
-import { OrderStatus } from '@/features/admin/orders/types';
+import { AdminOrder, OrderStatus } from '@/features/admin/orders/types';
 
 const STATUS_OPTIONS: { value: OrderStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'Tüm Siparişler' },
@@ -16,14 +17,42 @@ const STATUS_OPTIONS: { value: OrderStatus | 'all'; label: string }[] = [
 
 export default function AdminDeliveryQueuePage() {
   const [selectedStatus, setSelectedStatus] = useState<OrderStatus | undefined>(undefined);
+  const [orders, setOrders] = useState<AdminOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchAdminOrders()
+      .then(setOrders)
+      .catch(() => {
+        console.warn('API unavailable, using mock data');
+        setOrders(mockOrders);
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   const filteredOrders = useMemo(
-    () => filterOrdersByStatus(mockOrders, selectedStatus),
-    [selectedStatus]
+    () => filterOrdersByStatus(orders, selectedStatus),
+    [orders, selectedStatus]
   );
 
   const handleViewOrder = (orderId: number) => {
     window.location.href = `/orders/${orderId}`;
+  };
+
+  const handleUpdateStatus = async (orderId: number, status: OrderStatus) => {
+    // Update local state immediately
+    setOrders((prev) =>
+      prev.map((order) =>
+        order.order_id === orderId ? { ...order, status } : order
+      )
+    );
+    
+    // Try API call
+    try {
+      await updateOrderStatus(orderId, status);
+    } catch (error) {
+      console.warn('API update failed:', error);
+    }
   };
 
   return (
@@ -70,7 +99,7 @@ export default function AdminDeliveryQueuePage() {
         })}
       </div>
 
-      <DeliveryQueueTable orders={filteredOrders} onViewOrder={handleViewOrder} />
+      <DeliveryQueueTable orders={filteredOrders} onViewOrder={handleViewOrder} onUpdateStatus={handleUpdateStatus} />
     </div>
   );
 }
