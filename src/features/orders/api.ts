@@ -150,7 +150,7 @@ const MOCK_INVOICES: Record<number, Invoice> = {
 
 export const fetchOrders = async (): Promise<Order[]> => {
   try {
-    const rawOrders = await apiClient.get('/v1/orders') as any[];
+    const rawOrders = await apiClient.get('/v1/orders') as Record<string, any>[];
     const backendOrders = Array.isArray(rawOrders) ? rawOrders : [];
     const allOrders = [...MOCK_ORDERS, ...backendOrders];
     
@@ -163,13 +163,13 @@ export const fetchOrders = async (): Promise<Order[]> => {
 };
 
 // Helper to ensure all orders have consistent prices while preserving valid existing data
-const enrichOrder = (order: any): Order => {
-  const items = (order.items || order.order_items || []).map((item: any) => {
-    const productId = String(item.product_id || item.id || 0);
+const enrichOrder = (order: any): Order => { // eslint-disable-line @typescript-eslint/no-explicit-any
+  const items = ((order['items'] as any[]) || (order['order_items'] as any[]) || []).map((item) => {
+    const productId = String(item['product_id'] || item['id'] || 0);
     const product = mockProducts.find(p => p.id === productId);
     
     // ONLY override if price is 49.99 (the bugged temporary price) or missing
-    const currentPrice = item.price || item.unit_price || 0;
+    const currentPrice = Number(item['price'] || item['unit_price'] || 0);
     const price = (currentPrice === 49.99 || currentPrice === 0) 
       ? (product?.price || 250.00) 
       : currentPrice;
@@ -178,15 +178,14 @@ const enrichOrder = (order: any): Order => {
       ...item,
       product_id: Number(productId),
       price: price,
-      unit_price: price, // Add unit_price explicitly for invoice compatibility
-      quantity: item.quantity || 1,
-      name: item.name || product?.name || 'Ürün'
+      unit_price: price,
+      quantity: Number(item['quantity'] || 1),
+      name: String(item['name'] || product?.name || 'Ürün')
     };
   });
   
   const itemsTotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  // Preserve existing total if it includes fees (like the 59.90 Kapıda Ödeme fee)
-  const existingTotal = Number(order.total || order.total_price || 0);
+  const existingTotal = Number(order['total'] || order['total_price'] || 0);
   
   return {
     ...order,
@@ -226,13 +225,13 @@ export const fetchInvoice = async (orderId: string): Promise<Invoice> => {
   try {
     // 1. First attempt to get invoice from API
     try {
-      const apiInvoice = await apiClient.get(`/v1/orders/${orderId}/invoice`) as any;
+      const apiInvoice = await apiClient.get(`/v1/orders/${orderId}/invoice`) as Record<string, any>;
       // Strictly validate that we got a real invoice object with an ID and items
-      if (apiInvoice && apiInvoice.invoice_id && Array.isArray(apiInvoice.items) && apiInvoice.items.length > 0) {
-        return apiInvoice as Invoice;
+      if (apiInvoice && apiInvoice['invoice_id'] && Array.isArray(apiInvoice['items']) && apiInvoice['items'].length > 0) {
+        return apiInvoice as unknown as Invoice;
       }
       console.warn(`API returned invalid or empty invoice for order ${orderId}, using fallback.`);
-    } catch (e) {
+    } catch (_) {
       console.warn(`Invoice endpoint failed for order ${orderId}, using fallback.`);
     }
 

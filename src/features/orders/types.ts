@@ -11,6 +11,7 @@ export interface OrderItem {
   name: string;
   quantity: number;
   price: number;
+  unit_price?: number;
 }
 
 export interface InvoiceItem {
@@ -44,4 +45,6 @@ export interface Order {
   delivery_address: string;
   created_at: string;
   payment_method?: string;
+  customer_name?: string;
+  customer_email?: string;
 }
