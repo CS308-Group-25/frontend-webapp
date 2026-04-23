@@ -39,10 +39,11 @@ function formatTurkishDate(dateStr: string) {
 }
 
 function formatCurrency(amount: number) {
+  const safeAmount = typeof amount === 'number' ? amount : 0;
   return new Intl.NumberFormat('tr-TR', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(amount);
+  }).format(safeAmount);
 }
 
 export default function InvoiceDetailPage({ orderId }: InvoiceDetailPageProps) {
@@ -199,7 +200,7 @@ export default function InvoiceDetailPage({ orderId }: InvoiceDetailPageProps) {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-4 gap-4">
                   <div>
                     <p className="text-xs text-indigo-200 font-bold mb-2 uppercase tracking-wider">Tarih</p>
                     <p className="font-bold text-base">{formatTurkishDate(invoice.created_at)}</p>
@@ -221,6 +222,10 @@ export default function InvoiceDetailPage({ orderId }: InvoiceDetailPageProps) {
                       <CheckCircle2 className="w-4 h-4" />
                       Ödendi
                     </div>
+                  </div>
+                  <div>
+                    <p className="text-xs text-indigo-200 font-bold mb-2 uppercase tracking-wider">Sipariş Tarihi</p>
+                    <p className="font-bold text-base">{formatTurkishDate(invoice.created_at)}</p>
                   </div>
                 </div>
               </div>
@@ -263,7 +268,7 @@ export default function InvoiceDetailPage({ orderId }: InvoiceDetailPageProps) {
                           </span>
                         </td>
                         <td className="py-5 text-right text-slate-500 text-base">
-                          {formatCurrency(item.unit_price)} TL
+                          {formatCurrency(item.unit_price || (item.total_price / item.quantity))} TL
                         </td>
                         <td className="py-5 text-right font-bold text-slate-900 text-base">
                           {formatCurrency(item.total_price)} TL

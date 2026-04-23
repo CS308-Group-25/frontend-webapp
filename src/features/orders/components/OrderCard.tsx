@@ -117,7 +117,7 @@ export default function OrderCard({ order }: OrderCardProps) {
           Yeniden Sipariş Ver
         </button>
         
-        {order.invoice_id != null ? (
+        {order.status !== 'cancelled' ? (
           <Link
             href={`/orders/${order.id}/invoice`}
             className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 border border-indigo-200 text-indigo-700 text-sm font-semibold rounded-xl hover:bg-indigo-50 transition-colors"

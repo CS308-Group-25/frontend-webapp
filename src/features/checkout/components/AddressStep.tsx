@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { addressSchema, AddressFormValues } from '../schemas';
 import { AddressFormData } from '../types';
@@ -35,7 +35,7 @@ export default function AddressStep({ defaultValues, onComplete }: AddressStepPr
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     formState: { errors },
   } = useForm<AddressFormValues>({
     resolver: zodResolver(addressSchema),
@@ -53,7 +53,7 @@ export default function AddressStep({ defaultValues, onComplete }: AddressStepPr
     },
   });
 
-  const saveAddress = watch('saveAddress');
+  const saveAddress = useWatch({ control, name: 'saveAddress' });
 
   const onSubmit = (data: AddressFormValues) => {
     onComplete(data as AddressFormData);
