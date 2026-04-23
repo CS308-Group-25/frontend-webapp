@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useQuery } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import {
   CheckCircle2,
   Loader2,
@@ -14,12 +15,14 @@ import {
   Star,
   MessageSquare,
   X,
+  XCircle,
   Truck,
   Home,
   ArrowLeft,
 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
-import { fetchOrderById } from '../api';
+import { fetchOrderById, cancelOrder } from '../api';
 import { Order, OrderItem } from '../types';
 import OrderStatusBadge from './OrderStatusBadge';
 import { mockProducts } from '@/features/products';
@@ -239,7 +242,10 @@ function OrderTracker({ status }: { status: string }) {
   );
 }
 
+const CANCELLABLE_STATUSES = new Set(['created', 'processing']);
+
 export default function OrderDetailPage({ orderId, isNewOrder }: OrderDetailPageProps) {
+  const queryClient = useQueryClient();
   const {
     data: order,
     isLoading,
@@ -250,6 +256,8 @@ export default function OrderDetailPage({ orderId, isNewOrder }: OrderDetailPage
     retry: 1,
   });
 
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [reviewingItem, setReviewingItem] = useState<OrderItem | null>(null);
   const [rating, setRating] = useState(0);
@@ -295,6 +303,22 @@ export default function OrderDetailPage({ orderId, isNewOrder }: OrderDetailPage
   const handleDeleteReview = (productId: string) => {
     if (window.confirm('Değerlendirmenizi silmek istediğinize emin misiniz?')) {
       setMockReviews((prev) => prev.filter((r) => r.productId !== productId));
+    }
+  };
+
+  const handleCancelConfirm = async () => {
+    if (!order) return;
+    setIsCancelling(true);
+    try {
+      await cancelOrder(order.id);
+      toast.success('Siparişiniz iptal edildi.');
+      queryClient.invalidateQueries({ queryKey: ['order', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      setShowCancelConfirm(false);
+    } catch {
+      toast.error('Sipariş iptal edilemedi. Lütfen tekrar deneyin.');
+    } finally {
+      setIsCancelling(false);
     }
   };
 
@@ -398,29 +422,66 @@ export default function OrderDetailPage({ orderId, isNewOrder }: OrderDetailPage
                 </CollapsibleSection>
 
                 {/* Footer actions */}
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2">
-                  <p className="text-sm text-slate-500">
-                    Yardıma mı ihtiyacınız var?{' '}
-                    <a href="#" className="text-indigo-600 font-semibold hover:underline">
-                      Bizimle iletişime geçin
-                    </a>
-                  </p>
-                  <div className="flex items-center gap-2">
-                    {order.invoice_id != null && (
-                      <Link
-                        href={`/orders/${order.id}/invoice`}
-                        className="flex items-center gap-1.5 px-4 py-2.5 border border-indigo-200 text-indigo-700 font-bold rounded-xl hover:bg-indigo-50 transition-colors text-sm"
+                <div className="flex flex-col gap-3 pt-2">
+                  {/* Cancel confirmation strip */}
+                  {showCancelConfirm && (
+                    <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-100 rounded-2xl">
+                      <p className="flex-1 text-sm text-red-700 font-medium">
+                        Siparişi iptal etmek istediğinize emin misiniz?
+                      </p>
+                      <button
+                        onClick={() => setShowCancelConfirm(false)}
+                        disabled={isCancelling}
+                        className="px-4 py-2 border border-slate-200 bg-white text-slate-600 text-sm font-semibold rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50"
                       >
-                        <FileText className="w-4 h-4" />
-                        Fatura Görüntüle
+                        Vazgeç
+                      </button>
+                      <button
+                        onClick={handleCancelConfirm}
+                        disabled={isCancelling}
+                        className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm font-semibold rounded-xl hover:bg-red-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                      >
+                        {isCancelling && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                        Evet, İptal Et
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <p className="text-sm text-slate-500">
+                      Yardıma mı ihtiyacınız var?{' '}
+                      <a href="#" className="text-indigo-600 font-semibold hover:underline">
+                        Bizimle iletişime geçin
+                      </a>
+                    </p>
+                    <div className="flex items-center gap-2">
+                      {order.status !== 'cancelled' && order.status !== 'returned' && (
+                        <button
+                          onClick={() => setShowCancelConfirm(true)}
+                          disabled={!CANCELLABLE_STATUSES.has(order.status) || showCancelConfirm}
+                          title={!CANCELLABLE_STATUSES.has(order.status) ? 'Bu sipariş artık iptal edilemez' : undefined}
+                          className="flex items-center gap-1.5 px-4 py-2.5 border text-sm font-bold rounded-xl transition-colors disabled:cursor-not-allowed disabled:opacity-50 border-red-200 text-red-600 hover:bg-red-50 disabled:border-slate-200 disabled:text-slate-400 disabled:hover:bg-transparent"
+                        >
+                          <XCircle className="w-4 h-4" />
+                          Siparişi İptal Et
+                        </button>
+                      )}
+                      {order.invoice_id != null && (
+                        <Link
+                          href={`/orders/${order.id}/invoice`}
+                          className="flex items-center gap-1.5 px-4 py-2.5 border border-indigo-200 text-indigo-700 font-bold rounded-xl hover:bg-indigo-50 transition-colors text-sm"
+                        >
+                          <FileText className="w-4 h-4" />
+                          Fatura Görüntüle
+                        </Link>
+                      )}
+                      <Link
+                        href="/search"
+                        className="px-6 py-3 bg-indigo-700 text-white font-bold rounded-xl hover:bg-indigo-800 transition-colors text-sm"
+                      >
+                        Alışverişe Dön
                       </Link>
-                    )}
-                    <Link
-                      href="/search"
-                      className="px-6 py-3 bg-indigo-700 text-white font-bold rounded-xl hover:bg-indigo-800 transition-colors text-sm"
-                    >
-                      Alışverişe Dön
-                    </Link>
+                    </div>
                   </div>
                 </div>
               </div>
