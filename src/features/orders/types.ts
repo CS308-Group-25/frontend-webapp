@@ -13,6 +13,28 @@ export interface OrderItem {
   price: number;
 }
 
+export interface InvoiceItem {
+  product_id: number;
+  name: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+}
+
+export interface Invoice {
+  invoice_id: number;
+  order_id: number;
+  created_at: string;
+  customer_name: string;
+  customer_email: string;
+  delivery_address: string;
+  items: InvoiceItem[];
+  subtotal: number;
+  tax_amount: number;
+  total_amount: number;
+  payment_method?: string;
+}
+
 export interface Order {
   id: number;
   status: OrderStatus;
@@ -21,4 +43,5 @@ export interface Order {
   items: OrderItem[];
   delivery_address: string;
   created_at: string;
+  payment_method?: string;
 }
