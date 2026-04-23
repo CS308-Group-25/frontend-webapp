@@ -216,6 +216,10 @@ export const fetchOrderById = async (id: string): Promise<Order> => {
   }
 };
 
+export const cancelOrder = async (orderId: string | number): Promise<void> => {
+  await apiClient.delete(`/v1/orders/${orderId}`);
+};
+
 import { mockProducts } from '@/features/products';
 
 export const fetchInvoice = async (orderId: string): Promise<Invoice> => {
