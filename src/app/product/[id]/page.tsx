@@ -14,6 +14,7 @@ import {
   ProductAccordion,
   StockBadge
 } from '@/features/products';
+import WishlistButton from '@/features/wishlist/components/WishlistButton';
 
 
 /* ──────────────────────── Tag Badge Mapping ──────────────────────── */
@@ -320,8 +321,8 @@ export default function ProductDetailPage(props: { params: Promise<{ id: string 
             </div>
           </div>
 
-          {/* Quantity + Add to Cart */}
-          <div className="flex items-center gap-4">
+          {/* Quantity + Add to Cart + Wishlist */}
+          <div className="flex items-center gap-3">
             {!isOutOfStock && (
               <QuantitySelector
                 quantity={quantity}
@@ -337,6 +338,11 @@ export default function ProductDetailPage(props: { params: Promise<{ id: string 
                 disabled={isOutOfStock} 
               />
             </div>
+            <WishlistButton
+              productId={product.id}
+              size="md"
+              className="shrink-0"
+            />
           </div>
 
           {/* Trust Badges */}

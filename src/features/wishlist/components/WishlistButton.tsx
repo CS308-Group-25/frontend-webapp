@@ -5,7 +5,7 @@ import { useWishlistStore } from '../store/wishlist.store';
 
 interface WishlistButtonProps {
   productId: string;
-  /** Visual size: 'sm' for product cards, 'md' for detail page */
+  /** Visual size: 'sm' for product cards, 'md' for detail page (matches AddToCartButton height) */
   size?: 'sm' | 'md';
   className?: string;
 }
@@ -18,21 +18,21 @@ export default function WishlistButton({
   const { isInWishlist, toggleItem } = useWishlistStore();
   const saved = isInWishlist(productId);
 
-  const iconSize = size === 'sm' ? 'h-4 w-4' : 'h-5 w-5';
+  const iconSize = size === 'sm' ? 'h-4 w-4' : 'h-6 w-6';
 
   return (
     <button
       id={`wishlist-btn-${productId}`}
       aria-label={saved ? 'Favorilerden çıkar' : 'Favorilere ekle'}
-      onClick={(e) => {
+      onClick={async (e) => {
         e.preventDefault();
         e.stopPropagation();
-        toggleItem(productId);
+        await toggleItem(productId);
       }}
-      className={`group/heart flex items-center justify-center rounded-full transition-all duration-200 active:scale-90 ${
+      className={`group/heart flex items-center justify-center transition-all duration-200 active:scale-90 ${
         size === 'sm'
-          ? 'h-8 w-8 bg-white/80 backdrop-blur-sm shadow-sm hover:bg-red-50 border border-slate-100 hover:border-red-200'
-          : 'h-10 w-10 bg-slate-100 hover:bg-red-50 border border-transparent hover:border-red-200'
+          ? 'h-8 w-8 rounded-full bg-white/80 backdrop-blur-sm shadow-sm hover:bg-red-50 border border-slate-100 hover:border-red-200'
+          : 'h-12 w-12 rounded-xl bg-slate-100 hover:bg-red-50 border border-slate-200 hover:border-red-200 shadow-sm'
       } ${className}`}
     >
       <Heart
@@ -45,3 +45,4 @@ export default function WishlistButton({
     </button>
   );
 }
+
