@@ -4,7 +4,9 @@ export type OrderStatus =
   | 'shipped'
   | 'delivered'
   | 'cancelled'
-  | 'returned';
+  | 'returned'
+  | 'pending'
+  | 'confirmed';
 
 export interface OrderItem {
   product_id: number;

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { useCartStore } from '@/features/cart';
@@ -23,6 +24,7 @@ function detectCardBrand(cardNumber: string): string {
 
 export default function CheckoutPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { items, clearCart } = useCartStore();
   const [step, setStep] = useState<CheckoutStep>(1);
   const [addressData, setAddressData] = useState<AddressFormData | null>(null);
@@ -51,6 +53,24 @@ export default function CheckoutPage() {
 
     setIsSubmitting(true);
     try {
+      // --- Pre-flight: sync only items that are NOT yet in the server cart ---
+      // Logged-in users: items are already sent one-by-one via addItem() → POST /api/v1/cart/items
+      // Re-sending them via bulk would DOUBLE quantities on the server (backend does qty += existing).
+      // We only send items that truly weren't synced (no cartItemId = never reached the server).
+      const unsynced = items.filter(
+        (i) => !i.cartItemId && !isNaN(parseInt(i.productId)) && parseInt(i.productId) > 0
+      );
+      if (unsynced.length > 0) {
+        const { bulkAddCartItems } = await import('@/features/cart/api/cart.api');
+        await bulkAddCartItems(
+          unsynced.map((i) => ({
+            product_id: parseInt(i.productId),
+            quantity: i.quantity,
+          }))
+        );
+      }
+
+
       const deliveryAddress = [
         `${addressData.firstName} ${addressData.lastName}`,
         addressData.address,
@@ -75,6 +95,14 @@ export default function CheckoutPage() {
 
       const order = await createOrder(payload);
       clearCart();
+      // Invalidate product cache so stock counts reflect the purchase
+      // 'products' covers the listing page, 'product' covers individual detail pages
+      // 'orders' ensures the orders page shows the new order immediately
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['products'] }),
+        queryClient.invalidateQueries({ queryKey: ['product'] }),
+        queryClient.invalidateQueries({ queryKey: ['orders'] }),
+      ]);
       toast.success('Siparişiniz başarıyla oluşturuldu!');
       router.push(`/orders/${order.id}?new=1`);
     } catch (err) {

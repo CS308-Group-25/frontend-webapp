@@ -8,6 +8,14 @@ const STATUS_CONFIG: Record<OrderStatus, { label: string; className: string }> =
     label: 'Oluşturuldu',
     className: 'text-blue-700 bg-blue-50 border-blue-200',
   },
+  pending: {
+    label: 'Oluşturuldu',
+    className: 'text-blue-700 bg-blue-50 border-blue-200',
+  },
+  confirmed: {
+    label: 'Oluşturuldu',
+    className: 'text-blue-700 bg-blue-50 border-blue-200',
+  },
   processing: {
     label: 'Hazırlanıyor',
     className: 'text-amber-700 bg-amber-50 border-amber-200',

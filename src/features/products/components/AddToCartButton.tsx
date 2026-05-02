@@ -8,18 +8,27 @@ interface AddToCartButtonProps {
   quantity?: number;
   variantId?: string;
   disabled?: boolean;
+  /** Product display name — stored in localStorage so the cart shows it instantly */
+  name?: string;
+  /** Product price — stored in localStorage for offline cart total display */
+  price?: number;
+  /** Product image URL — stored in localStorage so the image shows before products are fetched */
+  image?: string;
 }
 
 export default function AddToCartButton({
   productId,
   quantity = 1,
   variantId,
-  disabled = false
+  disabled = false,
+  name,
+  price,
+  image,
 }: AddToCartButtonProps) {
   const { addItem, openDrawer } = useCartStore();
 
   const handleClick = () => {
-    addItem(productId, quantity, variantId);
+    addItem(productId, quantity, variantId, { name, price, image });
     openDrawer();
   };
 

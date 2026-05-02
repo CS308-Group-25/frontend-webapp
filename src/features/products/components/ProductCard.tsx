@@ -59,7 +59,7 @@ function NewBadge() {
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
-  const isOutOfStock = product.stockStatus === 'out_of_stock';
+  const isOutOfStock = product.stockStatus === 'out_of_stock' || product.stockCount === 0;
 
   return (
     <Link

@@ -17,7 +17,7 @@ import {
 import { useWishlistStore } from '@/features/wishlist';
 import { useCartStore } from '@/features/cart';
 import { useAuthStore } from '@/features/auth';
-import { fetchProduct } from '@/features/products/api/products.api';
+import { fetchProductDetail } from '@/features/products/api/products.api';
 import { Product } from '@/features/products';
 import { toast } from 'sonner';
 
@@ -95,7 +95,7 @@ export default function WishlistPage() {
 
     // Fetch all products in parallel
     const results = await Promise.allSettled(
-      ids.map((id) => fetchProduct(id)),
+      ids.map((id) => fetchProductDetail(id)),
     );
 
     const loaded: Product[] = [];

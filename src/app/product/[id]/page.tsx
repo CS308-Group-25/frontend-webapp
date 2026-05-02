@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ChevronRight, Star, Truck, ShieldCheck, Clock, Leaf, WheatOff, Package } from 'lucide-react';
 import {
-  mockProducts,
+  fetchProductDetail,
   ProductImageGallery,
   FlavorSelector,
   SizeSelector,
@@ -14,6 +14,7 @@ import {
   ProductAccordion,
   StockBadge
 } from '@/features/products';
+import { useQuery } from '@tanstack/react-query';
 import WishlistButton from '@/features/wishlist/components/WishlistButton';
 
 
@@ -60,8 +61,14 @@ function RatingStars({ rating, reviewCount }: { rating: number; reviewCount: num
 export default function ProductDetailPage(props: { params: Promise<{ id: string }> }) {
   const params = use(props.params);
   const router = useRouter();
-  const product = mockProducts.find((p) => p.id === params.id);
-  const isOutOfStock = product?.stockStatus === 'out_of_stock';
+
+  const { data: product, isLoading, isError } = useQuery({
+    queryKey: ['product', params.id],
+    queryFn: () => fetchProductDetail(params.id),
+    enabled: !!params.id,
+  });
+
+  const isOutOfStock = product?.stockStatus === 'out_of_stock' || product?.stockCount === 0;
 
   /* ── State ────────────────────────────────────────────────────── */
 
@@ -82,7 +89,20 @@ export default function ProductDetailPage(props: { params: Promise<{ id: string 
 
   /* ── 404 guard ────────────────────────────────────────────────── */
 
-  if (!product) {
+  /* ── 404 guard and Loading state ────────────────────────────────────────────────── */
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="flex flex-col items-center gap-4 text-slate-500">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600"></div>
+          <p className="font-medium animate-pulse">Ürün Detayları Yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isError || !product) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-center">
         <Package className="h-16 w-16 text-slate-300" />
@@ -335,7 +355,10 @@ export default function ProductDetailPage(props: { params: Promise<{ id: string 
                 productId={product.id}
                 quantity={quantity}
                 variantId={selectedSize}
-                disabled={isOutOfStock} 
+                disabled={isOutOfStock}
+                name={product.name}
+                price={product.price}
+                image={product.image || (product.images && product.images[0]) || '/placeholder.png'}
               />
             </div>
             <WishlistButton

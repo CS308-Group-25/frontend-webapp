@@ -3,9 +3,10 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
 import { ChevronDown, Tag } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { useCartStore } from '@/features/cart';
-import { mockProducts } from '@/features/products';
-import { PaymentMethod } from '../types';
+import { fetchProducts } from '@/features/products';
+import type { PaymentMethod } from '../types';
 
 const FREE_SHIPPING_THRESHOLD = 250;
 const STANDARD_SHIPPING = 59.9;
@@ -20,8 +21,15 @@ export default function OrderSummaryPanel({ paymentMethod = 'credit_card' }: Ord
   const [promoOpen, setPromoOpen] = useState(false);
   const [promoCode, setPromoCode] = useState('');
 
+  // Always use useQuery so that if cache is cold (e.g. direct /checkout visit), products are fetched
+  const { data } = useQuery({
+    queryKey: ['products', 'all'],
+    queryFn: () => fetchProducts(200),
+  });
+  const cachedProducts = data?.items ?? [];
+
   const cartDetails = items.map((cartItem) => {
-    const product = mockProducts.find((p) => p.id === cartItem.productId);
+    const product = cachedProducts.find((p) => p.id === cartItem.productId);
     return {
       ...cartItem,
       productName: product?.name ?? 'Ürün',

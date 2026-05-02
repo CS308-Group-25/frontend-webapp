@@ -25,7 +25,8 @@ import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { fetchOrderById, cancelOrder } from '../api';
 import { Order, OrderItem } from '../types';
 import OrderStatusBadge from './OrderStatusBadge';
-import { mockProducts } from '@/features/products';
+import { fetchProducts } from '@/features/products';
+import type { Product } from '@/features/products';
 
 interface OrderDetailPageProps {
   orderId: string;
@@ -58,16 +59,18 @@ function OrderItemRow({
   onReviewClick,
   mockReview,
   onDeleteReview,
+  cachedProducts,
 }: {
   item: OrderItem;
   isDelivered: boolean;
   onReviewClick: (item: OrderItem) => void;
   mockReview?: MockReview;
   onDeleteReview: (productId: string) => void;
+  cachedProducts: Product[];
 }) {
-  const product = mockProducts.find((p) => p.id === String(item.product_id));
+  const product = cachedProducts.find((p) => p.id === String(item.product_id));
   const imageSrc = product?.image ?? '/placeholder.png';
-  const name = product?.name ?? item.name;
+  const name = item.name;
 
   return (
     <div className="flex items-start gap-3">
@@ -242,7 +245,7 @@ function OrderTracker({ status }: { status: string }) {
   );
 }
 
-const CANCELLABLE_STATUSES = new Set(['created', 'processing']);
+const CANCELLABLE_STATUSES = new Set(['created', 'processing', 'pending', 'confirmed']);
 
 export default function OrderDetailPage({ orderId, isNewOrder }: OrderDetailPageProps) {
   const queryClient = useQueryClient();
@@ -255,6 +258,13 @@ export default function OrderDetailPage({ orderId, isNewOrder }: OrderDetailPage
     queryFn: () => fetchOrderById(orderId),
     retry: 1,
   });
+
+  // Product catalogue cache for images
+  const { data: productsData } = useQuery({
+    queryKey: ['products', 'all'],
+    queryFn: () => fetchProducts(200),
+  });
+  const cachedProducts: Product[] = productsData?.items ?? [];
 
   const [isCancelling, setIsCancelling] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
@@ -458,8 +468,8 @@ export default function OrderDetailPage({ orderId, isNewOrder }: OrderDetailPage
                       {order.status !== 'cancelled' && order.status !== 'returned' && (
                         <button
                           onClick={() => setShowCancelConfirm(true)}
-                          disabled={!CANCELLABLE_STATUSES.has(order.status) || showCancelConfirm}
-                          title={!CANCELLABLE_STATUSES.has(order.status) ? 'Bu sipariş artık iptal edilemez' : undefined}
+                          disabled={!order || !CANCELLABLE_STATUSES.has(String(order.status || '').trim().toLowerCase()) || showCancelConfirm}
+                          title={!order || !CANCELLABLE_STATUSES.has(String(order.status || '').trim().toLowerCase()) ? 'Bu sipariş artık iptal edilemez' : undefined}
                           className="flex items-center gap-1.5 px-4 py-2.5 border text-sm font-bold rounded-xl transition-colors disabled:cursor-not-allowed disabled:opacity-50 border-red-200 text-red-600 hover:bg-red-50 disabled:border-slate-200 disabled:text-slate-400 disabled:hover:bg-transparent"
                         >
                           <XCircle className="w-4 h-4" />
@@ -497,6 +507,7 @@ export default function OrderDetailPage({ orderId, isNewOrder }: OrderDetailPage
                       onReviewClick={handleReviewClick}
                       mockReview={mockReviews.find((r) => r.productId === String(item.product_id))}
                       onDeleteReview={handleDeleteReview}
+                      cachedProducts={cachedProducts}
                     />
                   ))}
                 </div>
@@ -534,7 +545,7 @@ export default function OrderDetailPage({ orderId, isNewOrder }: OrderDetailPage
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 relative bg-slate-50 rounded-xl border border-slate-100">
                       <Image
-                        src={mockProducts.find((p) => p.id === String(reviewingItem.product_id))?.image ?? '/placeholder.png'}
+                        src={cachedProducts.find((p) => p.id === String(reviewingItem.product_id))?.image ?? '/placeholder.png'}
                         alt={reviewingItem.name}
                         fill
                         className="object-contain p-1"

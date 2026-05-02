@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { addCartItem, fetchCartItems, updateCartItem as apiUpdateCartItem, removeCartItem as apiRemoveCartItem } from '../api/cart.api';
+import { addCartItem, bulkAddCartItems, fetchCartItems, updateCartItem as apiUpdateCartItem, removeCartItem as apiRemoveCartItem } from '../api/cart.api';
 import { useAuthStore } from '@/features/auth';
 import { toast } from 'sonner';
 
@@ -16,6 +16,12 @@ export interface CartItem {
   variantId?: string;
   /** Remote Cart Item ID (only available when authenticated and synced) */
   cartItemId?: number;
+  /** Product display name — persisted so it shows before products are fetched */
+  name?: string;
+  /** Product price at time of adding — persisted for offline display */
+  price?: number;
+  /** Product image URL — persisted so cart shows image instantly */
+  image?: string;
 }
 
 /** Zustand state for the guest cart */
@@ -27,7 +33,7 @@ interface CartState {
   /** Persistent flag to avoid redundant merge attempts for the same set of items */
   mergeAttempted: boolean;
   /** Add a product (or increase quantity) */
-  addItem: (productId: string, quantity?: number, variantId?: string) => Promise<void>;
+  addItem: (productId: string, quantity?: number, variantId?: string, meta?: { name?: string; price?: number; image?: string }) => Promise<void>;
   /** Update quantity of a product */
   updateItem: (productId: string, quantity: number) => Promise<void>;
   /** Remove a product from the cart */
@@ -55,16 +61,7 @@ interface CartItemServerResponse {
   quantity: number;
 }
 
-/**
- * Expected shape of an error response from the backend.
- */
-interface ApiError {
-  response?: {
-    data?: {
-      detail?: string;
-    };
-  };
-}
+
 
 export const useCartStore = create<CartState>()(
   persist(
@@ -97,7 +94,7 @@ export const useCartStore = create<CartState>()(
         }
       },
 
-      addItem: async (productId, quantity = 1, variantId) => {
+      addItem: async (productId, quantity = 1, variantId, meta) => {
         const { items } = get();
         const isAuth = useAuthStore.getState().isAuthenticated;
         
@@ -112,14 +109,14 @@ export const useCartStore = create<CartState>()(
           set({
             items: items.map((i) =>
               i.productId === productId && i.variantId === variantId
-                ? { ...i, quantity: i.quantity + quantity }
+                ? { ...i, quantity: i.quantity + quantity, ...meta }
                 : i,
             ),
             mergeAttempted: false,
           });
         } else {
           set({
-            items: [...items, { productId, quantity, variantId }],
+            items: [...items, { productId, quantity, variantId, ...meta }],
             mergeAttempted: false,
           });
         }
@@ -217,9 +214,15 @@ export const useCartStore = create<CartState>()(
           try {
             await apiRemoveCartItem(targetItem.cartItemId);
           } catch (error) {
+            // If 404 → item already gone from server, keep local delete (don't rollback)
+            const status = (error as { response?: { status?: number } })?.response?.status;
+            if (status === 404) {
+              console.warn('[CartStore] Cart item already removed from server, keeping local delete.');
+              return;
+            }
             console.error('[CartStore] Failed to remove item from server:', error);
             toast.error('Ürün silinemedi.');
-            set({ items: previousItems }); // Rollback
+            set({ items: previousItems }); // Rollback only on non-404 errors
           }
         }
       },
@@ -239,41 +242,39 @@ export const useCartStore = create<CartState>()(
 
         set({ isMerging: true });
 
-        const succeeded: string[] = [];
-        const failed: { productId: string; reason: string }[] = [];
-        const updatedLocalItems: CartItem[] = [];
-
         try {
-          for (const item of items) {
-            try {
-              const response = (await addCartItem(item.productId, item.quantity)) as unknown as CartItemServerResponse;
-              succeeded.push(item.productId);
-              // Store cart_item_id locally immediately, so if fetch fails we are safe
-              updatedLocalItems.push({ ...item, cartItemId: response.id });
-            } catch (error) {
-              let reason = 'Bilinmeyen bir hata oluştu';
-              const apiError = error as ApiError;
-              if (apiError.response?.data?.detail) {
-                reason = apiError.response.data.detail;
-              }
-              failed.push({ productId: item.productId, reason });
-              // Keep failed items exactly as they were
-              updatedLocalItems.push(item);
-            }
-          }
+          // Build bulk payload from local guest cart
+          const bulkItems = items
+            .map((item) => ({
+              product_id: parseInt(item.productId),
+              quantity: item.quantity,
+            }))
+            .filter((i) => !isNaN(i.product_id) && i.product_id > 0);
 
-          // Always set items to updated array with new cartItemIds
+          const result = await bulkAddCartItems(bulkItems);
+
+          // Map server-assigned IDs back to local items
+          const updatedLocalItems = items.map((localItem) => {
+            const added = result.added.find(
+              (a) => String(a.product_id) === localItem.productId
+            );
+            return added ? { ...localItem, cartItemId: added.id } : localItem;
+          });
+
           set({ items: updatedLocalItems, mergeAttempted: true });
 
-          if (failed.length > 0 && succeeded.length > 0) {
-            toast.warning(`${succeeded.length} ürün hesabınıza aktarıldı.`, {
-              description: `${failed.length} ürün aktarılamadı ve sepetinizde kaldı.`,
+          const rejectedCount = result.rejected.length;
+          const addedCount = result.added.length;
+
+          if (rejectedCount > 0 && addedCount > 0) {
+            toast.warning(`${addedCount} ürün hesabınıza aktarıldı.`, {
+              description: `${rejectedCount} ürün aktarılamadı (stok yetersiz olabilir).`,
             });
-          } else if (succeeded.length > 0) {
+          } else if (addedCount > 0) {
             toast.success('Misafir sepetiniz hesabınızla birleştirildi!');
           }
 
-          // Fetch the final state of the server cart as absolute source of truth
+          // Fetch the final state from server as absolute source of truth
           await fetchServerCart();
 
         } catch (error) {

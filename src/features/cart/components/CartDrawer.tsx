@@ -5,9 +5,10 @@ import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { X, Trash2, Plus, Minus, ShoppingBag } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useCartStore } from '../store/cart.store';
 import { useAuthStore } from '@/features/auth';
-import { mockProducts } from '@/features/products';
+import type { PaginatedProductResponse } from '@/features/products';
 
 export const CartDrawer = () => {
   const {
@@ -20,6 +21,12 @@ export const CartDrawer = () => {
   const { isAuthenticated } = useAuthStore();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
+
+  // Read the already-fetched product catalogue from the React Query cache.
+  // This avoids an extra API call since the search page already populated the cache.
+  const queryClient = useQueryClient();
+  const cachedData = queryClient.getQueryData<PaginatedProductResponse>(['products', 'all']);
+  const cachedProducts = cachedData?.items ?? [];
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -40,16 +47,19 @@ export const CartDrawer = () => {
 
   if (!isDrawerOpen || !mounted) return null;
 
-  // Calculate cart details using mock products
+  // Enrich cart items with product details.
+  // Prefer values persisted in localStorage (item.name/price/image),
+  // fall back to the React Query product cache if not available.
   const cartDetails = items.map((cartItem) => {
-    const product = mockProducts.find((p) => p.id === cartItem.productId);
+    const product = cachedProducts.find((p) => p.id === cartItem.productId);
     return {
       ...cartItem,
-      productName: product?.name || 'Bilinmeyen Ürün',
-      productPrice: product?.price || 0,
-      productImage: product?.image || '/placeholder.png', // Fallback image if any
+      productName: cartItem.name || product?.name || 'Ürün',
+      productPrice: cartItem.price ?? product?.price ?? 0,
+      productImage: cartItem.image || product?.image || '/placeholder.png',
     };
   });
+
 
   const totalAmount = cartDetails.reduce(
     (total, item) => total + item.productPrice * item.quantity,
