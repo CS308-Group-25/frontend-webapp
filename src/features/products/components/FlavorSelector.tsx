@@ -7,15 +7,17 @@ interface FlavorSelectorProps {
   flavors: ProductFlavor[];
   selectedId: string;
   onSelect: (id: string) => void;
+  /** Heading label shown above the selector. Defaults to 'Aroma:' */
+  label?: string;
 }
 
-export default function FlavorSelector({ flavors, selectedId, onSelect }: FlavorSelectorProps) {
+export default function FlavorSelector({ flavors, selectedId, onSelect, label = 'Aroma:' }: FlavorSelectorProps) {
   if (!flavors || flavors.length === 0) return null;
 
   return (
     <div>
       <h3 className="mb-3 text-sm font-extrabold uppercase tracking-wider text-slate-900">
-        Aroma:
+        {label}
       </h3>
       <div className="flex flex-wrap gap-3">
         {flavors.map((flavor) => {

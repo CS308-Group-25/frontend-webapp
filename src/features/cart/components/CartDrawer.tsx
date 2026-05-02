@@ -118,8 +118,8 @@ export const CartDrawer = () => {
             </div>
           ) : (
             <div className="flex flex-col gap-6">
-              {cartDetails.map((item) => (
-                <div key={item.productId} className="flex gap-4 border-b border-slate-100 pb-4 last:border-0 last:pb-0">
+              {cartDetails.map((item, index) => (
+                <div key={`cart-item-${item.cartItemId ?? 'local'}-${item.productId}-${index}`} className="flex gap-4 border-b border-slate-100 pb-4 last:border-0 last:pb-0">
                   {/* Product Image */}
                   <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-slate-50 border border-slate-100">
                     <Image
@@ -134,11 +134,18 @@ export const CartDrawer = () => {
                   {/* Product Details */}
                   <div className="flex flex-1 flex-col py-1">
                     <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-bold text-slate-800 line-clamp-2 leading-tight">
-                        {item.productName}
-                      </h3>
+                      <div className="flex flex-col">
+                        <h3 className="font-bold text-slate-800 line-clamp-2 leading-tight">
+                          {item.productName}
+                        </h3>
+                        {(item.flavor || item.size) && (
+                          <div className="mt-1 text-sm font-bold text-slate-400">
+                            {[item.flavor, item.size].filter(Boolean).join(' / ')}
+                          </div>
+                        )}
+                      </div>
                       <button
-                        onClick={() => removeItem(item.productId)}
+                        onClick={() => removeItem(item.productId, item.cartItemId)}
                         className="text-slate-400 transition-colors hover:text-red-500"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -149,7 +156,7 @@ export const CartDrawer = () => {
                       {/* Quantity Selector */}
                       <div className="flex items-center rounded-lg border border-slate-200 bg-white">
                         <button
-                          onClick={() => updateItem(item.productId, item.quantity - 1)}
+                          onClick={() => updateItem(item.productId, item.quantity - 1, item.cartItemId)}
                           className="p-1.5 text-slate-500 transition-colors hover:bg-slate-50 hover:text-indigo-600 focus:outline-none"
                         >
                           <Minus className="h-3.5 w-3.5" />
@@ -158,7 +165,7 @@ export const CartDrawer = () => {
                           {item.quantity}
                         </span>
                         <button
-                          onClick={() => updateItem(item.productId, item.quantity + 1)}
+                          onClick={() => updateItem(item.productId, item.quantity + 1, item.cartItemId)}
                           className="p-1.5 text-slate-500 transition-colors hover:bg-slate-50 hover:text-indigo-600 focus:outline-none"
                         >
                           <Plus className="h-3.5 w-3.5" />
@@ -167,7 +174,7 @@ export const CartDrawer = () => {
 
                       <div className="text-right">
                         <p className="font-black text-slate-900">
-                          {item.productPrice * item.quantity} TL
+                          {(item.productPrice * item.quantity).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                         </p>
                       </div>
                     </div>
@@ -183,7 +190,7 @@ export const CartDrawer = () => {
           <div className="border-t border-slate-100 bg-white p-6 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)]">
             <div className="mb-4 flex items-center justify-between text-lg font-black text-slate-900">
               <span>Toplam</span>
-              <span>{totalAmount} TL</span>
+              <span>{totalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
             </div>
             <button
               onClick={handleCheckout}

@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useState, useMemo } from 'react';
+import { use, useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ChevronRight, Star, Truck, ShieldCheck, Clock, Leaf, WheatOff, Package } from 'lucide-react';
@@ -16,6 +16,7 @@ import {
 } from '@/features/products';
 import { useQuery } from '@tanstack/react-query';
 import WishlistButton from '@/features/wishlist/components/WishlistButton';
+import { toast } from 'sonner';
 
 
 /* ──────────────────────── Tag Badge Mapping ──────────────────────── */
@@ -69,12 +70,27 @@ export default function ProductDetailPage(props: { params: Promise<{ id: string 
   });
 
   const isOutOfStock = product?.stockStatus === 'out_of_stock' || product?.stockCount === 0;
+  // Accessories use the 'flavors' field to store colors — detect by category
+  const isAccessory = product?.category?.toLowerCase().includes('aksesuar') ?? false;
 
   /* ── State ────────────────────────────────────────────────────── */
 
-  const [selectedFlavor, setSelectedFlavor] = useState(product?.flavors?.[0]?.id ?? '');
-  const [selectedSize, setSelectedSize] = useState(product?.sizes?.[0]?.id ?? '');
+  const [selectedFlavor, setSelectedFlavor] = useState('');
+  const [selectedSize, setSelectedSize] = useState('');
   const [quantity, setQuantity] = useState(1);
+
+  // Auto-select if there is exactly 1 option
+  useEffect(() => {
+    if (product) {
+      if (product.flavors?.length === 1 && !selectedFlavor) {
+        // eslint-disable-next-line
+        setSelectedFlavor(product.flavors[0].id);
+      }
+      if (product.sizes?.length === 1 && !selectedSize) {
+        setSelectedSize(product.sizes[0].id);
+      }
+    }
+  }, [product, selectedFlavor, selectedSize]);
 
   /* Resolve price from selected size variant (or fall back to base price) */
   const activeSizeVariant = useMemo(
@@ -288,12 +304,13 @@ export default function ProductDetailPage(props: { params: Promise<{ id: string 
           {/* Divider */}
           <hr className="border-slate-100" />
 
-          {/* Flavor Selector */}
+          {/* Flavor / Color Selector */}
           {product.flavors && product.flavors.length > 0 && (
             <FlavorSelector
               flavors={product.flavors}
               selectedId={selectedFlavor}
               onSelect={setSelectedFlavor}
+              label={isAccessory ? 'Renk:' : 'Aroma:'}
             />
           )}
 
@@ -354,11 +371,25 @@ export default function ProductDetailPage(props: { params: Promise<{ id: string 
               <AddToCartButton 
                 productId={product.id}
                 quantity={quantity}
-                variantId={selectedSize}
+                variantId={[selectedFlavor, selectedSize].filter(Boolean).join('-')}
                 disabled={isOutOfStock}
                 name={product.name}
                 price={product.price}
                 image={product.image || (product.images && product.images[0]) || '/placeholder.png'}
+                flavor={product.flavors?.find(f => f.id === selectedFlavor)?.name}
+                size={product.sizes?.find(s => s.id === selectedSize)?.label}
+                onClick={(e) => {
+                  if (product.flavors && product.flavors.length > 1 && !selectedFlavor) {
+                    toast.error(isAccessory ? 'Lütfen bir renk seçiniz.' : 'Lütfen bir aroma seçiniz.');
+                    e.preventDefault();
+                    return;
+                  }
+                  if (product.sizes && product.sizes.length > 1 && !selectedSize) {
+                    toast.error('Lütfen bir boyut seçiniz.');
+                    e.preventDefault();
+                    return;
+                  }
+                }}
               />
             </div>
             <WishlistButton

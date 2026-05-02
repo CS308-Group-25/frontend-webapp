@@ -14,6 +14,7 @@ export interface OrderItem {
   quantity: number;
   price: number;
   unit_price?: number;
+  variant_name?: string;
 }
 
 export interface InvoiceItem {

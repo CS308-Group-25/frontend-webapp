@@ -72,6 +72,21 @@ function OrderItemRow({
   const imageSrc = product?.image ?? '/placeholder.png';
   const name = item.name;
 
+  let flavor, size;
+  if (item.variant_name) {
+    try {
+      const parsed = JSON.parse(item.variant_name);
+      flavor = parsed.flavor;
+      size = parsed.size;
+    } catch {
+      const parts = item.variant_name.split(' / ');
+      flavor = parts[0];
+      size = parts[1];
+    }
+  }
+
+  const variantText = [flavor, size].filter(Boolean).join(' / ') || `${item.quantity} Paket`;
+
   return (
     <div className="flex items-start gap-3">
       <div className="relative shrink-0">
@@ -90,8 +105,8 @@ function OrderItemRow({
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-bold text-slate-800 line-clamp-2">{name}</p>
-        <p className="text-xs text-slate-400 mt-0.5">
-          {item.quantity} Paket
+        <p className="text-xs font-semibold text-slate-400 mt-0.5">
+          {variantText}
         </p>
         {isDelivered && !mockReview && (
           <button
@@ -139,7 +154,7 @@ function OrderItemRow({
         )}
       </div>
       <div className="text-right shrink-0">
-        <p className="text-sm font-bold text-slate-900">{item.price * item.quantity} TL</p>
+        <p className="text-sm font-bold text-slate-900">{(Math.round(item.price * item.quantity * 100) / 100).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</p>
       </div>
     </div>
   );
@@ -418,7 +433,7 @@ export default function OrderDetailPage({ orderId, isNewOrder }: OrderDetailPage
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-slate-500 font-medium">Sipariş Tutarı</span>
                     <span className="font-bold text-slate-800">
-                      {order.total} TL / {totalItems} ürün
+                      {(Math.round(order.total * 100) / 100).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL / {totalItems} ürün
                     </span>
                   </div>
                 </div>
@@ -514,8 +529,8 @@ export default function OrderDetailPage({ orderId, isNewOrder }: OrderDetailPage
                 <div className="pt-4 flex items-start justify-between">
                   <span className="text-lg font-black text-slate-900">Toplam</span>
                   <div className="text-right">
-                    <p className="text-xl font-black text-slate-900">{order.total} TL</p>
-                    <p className="text-xs text-slate-400 font-medium">Vergi {taxAmount} TL</p>
+                    <p className="text-xl font-black text-slate-900">{(Math.round(order.total * 100) / 100).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</p>
+                    <p className="text-xs text-slate-400 font-medium">Vergi {(Math.round(taxAmount * 100) / 100).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</p>
                     {(order.payment_method?.includes('Nakit') || order.payment_method?.includes('Kapıda')) && (
                       <p className="text-xs text-slate-400 font-medium mt-0.5">Kapıda Ödeme Hizmet Bedeli 59.90 TL</p>
                     )}

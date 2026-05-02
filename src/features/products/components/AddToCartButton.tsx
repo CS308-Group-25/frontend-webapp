@@ -14,6 +14,12 @@ interface AddToCartButtonProps {
   price?: number;
   /** Product image URL — stored in localStorage so the image shows before products are fetched */
   image?: string;
+  /** Selected flavor name to display in the cart */
+  flavor?: string;
+  /** Selected size name to display in the cart */
+  size?: string;
+  /** Optional click handler to perform validation. Call e.preventDefault() to stop adding to cart. */
+  onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
 }
 
 export default function AddToCartButton({
@@ -24,11 +30,18 @@ export default function AddToCartButton({
   name,
   price,
   image,
+  flavor,
+  size,
+  onClick,
 }: AddToCartButtonProps) {
   const { addItem, openDrawer } = useCartStore();
 
-  const handleClick = () => {
-    addItem(productId, quantity, variantId, { name, price, image });
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (onClick) {
+      onClick(e);
+      if (e.defaultPrevented) return;
+    }
+    addItem(productId, quantity, variantId, { name, price, image, flavor, size });
     openDrawer();
   };
 

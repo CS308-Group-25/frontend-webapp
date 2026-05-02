@@ -22,6 +22,10 @@ export interface CartItem {
   price?: number;
   /** Product image URL — persisted so cart shows image instantly */
   image?: string;
+  /** Selected flavor name */
+  flavor?: string;
+  /** Selected size name */
+  size?: string;
 }
 
 /** Zustand state for the guest cart */
@@ -33,11 +37,11 @@ interface CartState {
   /** Persistent flag to avoid redundant merge attempts for the same set of items */
   mergeAttempted: boolean;
   /** Add a product (or increase quantity) */
-  addItem: (productId: string, quantity?: number, variantId?: string, meta?: { name?: string; price?: number; image?: string }) => Promise<void>;
+  addItem: (productId: string, quantity?: number, variantId?: string, meta?: { name?: string; price?: number; image?: string; flavor?: string; size?: string }) => Promise<void>;
   /** Update quantity of a product */
-  updateItem: (productId: string, quantity: number) => Promise<void>;
+  updateItem: (productId: string, quantity: number, cartItemId?: number) => Promise<void>;
   /** Remove a product from the cart */
-  removeItem: (productId: string) => Promise<void>;
+  removeItem: (productId: string, cartItemId?: number) => Promise<void>;
   /** Clear the entire cart */
   clearCart: () => void;
   /** Merges the local guest cart with the server cart after login */
@@ -57,9 +61,15 @@ interface CartState {
  */
 interface CartItemServerResponse {
   id: number;
+  cart_id: number;
   product_id: number;
   quantity: number;
+  variant_name: string | null;
+  product_name?: string;
+  product_price?: number;
+  product_image?: string;
 }
+
 
 
 
@@ -80,11 +90,35 @@ export const useCartStore = create<CartState>()(
 
         try {
           const serverItems = (await fetchCartItems()) as unknown as CartItemServerResponse[];
-          const mappedItems: CartItem[] = serverItems.map((item) => ({
-            productId: String(item.product_id),
-            quantity: item.quantity,
-            cartItemId: item.id, // Store the server ID
-          }));
+          const mappedItems: CartItem[] = serverItems.map((item) => {
+            let flavor, size, variantId;
+            if (item.variant_name) {
+              try {
+                // Try parsing as JSON first (robust variant storage)
+                const parsed = JSON.parse(item.variant_name);
+                flavor = parsed.flavor;
+                size = parsed.size;
+                variantId = parsed.variantId;
+              } catch {
+                // Fallback for old string format like "Çikolata / 400g"
+                const parts = item.variant_name.split(' / ');
+                flavor = parts[0];
+                size = parts[1];
+              }
+            }
+            
+            return {
+              productId: String(item.product_id),
+              quantity: item.quantity,
+              cartItemId: item.id,
+              variantId: variantId,
+              name: item.product_name || `Ürün ${item.product_id}`,
+              price: item.product_price || 0,
+              image: item.product_image || '/placeholder.png',
+              flavor,
+              size,
+            };
+          });
           
           set({ items: mappedItems, mergeAttempted: true });
         } catch (error) {
@@ -130,7 +164,10 @@ export const useCartStore = create<CartState>()(
               await apiUpdateCartItem(existing.cartItemId, newQuantity);
             } else {
               // Item is completely new on server
-              const response = (await addCartItem(productId, quantity)) as unknown as CartItemServerResponse;
+              const variantNamePayload = (meta?.flavor || meta?.size || variantId) 
+                ? JSON.stringify({ flavor: meta?.flavor, size: meta?.size, variantId }) 
+                : undefined;
+              const response = (await addCartItem(productId, quantity, variantNamePayload)) as unknown as CartItemServerResponse;
               // Add the new cartItemId to our optimistically created local item
               set({
                 items: get().items.map((i) => 
@@ -151,27 +188,34 @@ export const useCartStore = create<CartState>()(
         }
       },
 
-      updateItem: async (productId, quantity) => {
+      updateItem: async (productId, quantity, cartItemId?: number) => {
         if (quantity <= 0) {
-          await get().removeItem(productId);
+          await get().removeItem(productId, cartItemId);
           return;
         }
 
         const { items } = get();
         const isAuth = useAuthStore.getState().isAuthenticated;
-        const targetItem = items.find((i) => i.productId === productId);
+        
+        // Find specific target (prioritize exact cartItemId if we have duplicates)
+        const targetItem = cartItemId 
+          ? items.find((i) => i.cartItemId === cartItemId)
+          : items.find((i) => i.productId === productId);
+          
+        if (!targetItem) return;
+
         const previousItems = [...items]; // Save for rollback
 
-        // Optimistic Update
+        // Optimistic Update: Only update the SPECIFIC item we clicked on
         set({
           items: items.map((i) =>
-            i.productId === productId ? { ...i, quantity } : i,
+            i === targetItem ? { ...i, quantity } : i,
           ),
           mergeAttempted: false,
         });
 
         // Server Sync
-        if (isAuth && targetItem?.cartItemId) {
+        if (isAuth && targetItem.cartItemId) {
           try {
             await apiUpdateCartItem(targetItem.cartItemId, quantity);
           } catch (error) {
@@ -179,13 +223,12 @@ export const useCartStore = create<CartState>()(
             toast.error('Stok miktarı güncellenemedi.');
             set({ items: previousItems }); // Rollback
           }
-        } else if (isAuth && !targetItem?.cartItemId) {
-          // Recovery edge-case: item is local but missing ID, so we add it directly
+        } else if (isAuth && !targetItem.cartItemId) {
           try {
              const response = (await addCartItem(productId, quantity)) as unknown as CartItemServerResponse;
              set({
                 items: get().items.map((i) => 
-                  i.productId === productId
+                  i === targetItem
                     ? { ...i, cartItemId: response.id }
                     : i
                 )
@@ -197,15 +240,21 @@ export const useCartStore = create<CartState>()(
         }
       },
 
-      removeItem: async (productId) => {
+      removeItem: async (productId, cartItemId?: number) => {
         const { items } = get();
         const isAuth = useAuthStore.getState().isAuthenticated;
-        const targetItem = items.find((i) => i.productId === productId);
+        
+        const targetItem = cartItemId 
+          ? items.find((i) => i.cartItemId === cartItemId)
+          : items.find((i) => i.productId === productId);
+
+        if (!targetItem) return;
+        
         const previousItems = [...items]; // Save for rollback
 
-        // Optimistic Delete
+        // Optimistic Delete: Only delete the SPECIFIC item
         set({
-          items: items.filter((i) => i.productId !== productId),
+          items: items.filter((i) => i !== targetItem),
           mergeAttempted: false,
         });
 
@@ -248,6 +297,9 @@ export const useCartStore = create<CartState>()(
             .map((item) => ({
               product_id: parseInt(item.productId),
               quantity: item.quantity,
+              variant_name: (item.flavor || item.size || item.variantId) 
+                ? JSON.stringify({ flavor: item.flavor, size: item.size, variantId: item.variantId }) 
+                : undefined,
             }))
             .filter((i) => !isNaN(i.product_id) && i.product_id > 0);
 

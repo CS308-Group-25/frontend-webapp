@@ -9,6 +9,7 @@ interface RawOrderItem {
   quantity?: number;
   price?: number | string;
   unit_price?: number | string;
+  variant_name?: string;
 }
 
 // Raw backend order shape
@@ -35,6 +36,7 @@ const normaliseOrder = (raw: RawOrder): Order => {
     quantity: Number(item.quantity ?? 1),
     price: Number(item.price ?? item.unit_price ?? 0),
     unit_price: Number(item.unit_price ?? item.price ?? 0),
+    variant_name: item.variant_name,
   }));
 
   const itemsTotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);

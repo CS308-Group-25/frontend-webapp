@@ -30,12 +30,15 @@ export default function OrderSummaryPanel({ paymentMethod = 'credit_card' }: Ord
 
   const cartDetails = items.map((cartItem) => {
     const product = cachedProducts.find((p) => p.id === cartItem.productId);
+    // Round to 2 decimals to avoid floating point issues (e.g. 3 × 1355.95 = 4067.850000000004)
+    const rawPrice = cartItem.price ?? product?.price ?? 0;
+    const productPrice = Math.round(rawPrice * 100) / 100;
     return {
       ...cartItem,
-      productName: product?.name ?? 'Ürün',
-      productPrice: product?.price ?? 0,
+      productName: product?.name ?? cartItem.name ?? 'Ürün',
+      productPrice,
       originalPrice: product?.originalPrice,
-      productImage: product?.image ?? '/placeholder.png',
+      productImage: cartItem.image || product?.image || '/placeholder.png',
     };
   });
 
@@ -51,8 +54,8 @@ export default function OrderSummaryPanel({ paymentMethod = 'credit_card' }: Ord
     <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 sticky top-24">
       {/* Items */}
       <div className="flex flex-col gap-4 pb-4 border-b border-slate-100">
-        {cartDetails.map((item) => (
-          <div key={item.productId} className="flex items-start gap-3">
+        {cartDetails.map((item, index) => (
+          <div key={item.cartItemId || `${item.productId}-${item.variantId || index}`} className="flex items-start gap-3">
             <div className="relative shrink-0">
               <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-slate-50 border border-slate-100">
                 <Image
@@ -71,8 +74,10 @@ export default function OrderSummaryPanel({ paymentMethod = 'credit_card' }: Ord
               <p className="text-sm font-bold text-slate-800 leading-tight line-clamp-2">
                 {item.productName}
               </p>
-              {item.variantId && (
-                <p className="text-xs text-slate-400 mt-0.5">1 Paket</p>
+              {(item.flavor || item.size) && (
+                <p className="text-xs font-semibold text-slate-400 mt-0.5">
+                  {[item.flavor, item.size].filter(Boolean).join(' / ')}
+                </p>
               )}
             </div>
             <div className="text-right shrink-0">
@@ -82,7 +87,7 @@ export default function OrderSummaryPanel({ paymentMethod = 'credit_card' }: Ord
                 </p>
               )}
               <p className="text-sm font-bold text-slate-900">
-                {item.productPrice * item.quantity} TL
+                {(item.productPrice * item.quantity).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
               </p>
             </div>
           </div>
@@ -95,7 +100,7 @@ export default function OrderSummaryPanel({ paymentMethod = 'credit_card' }: Ord
           <span className="text-slate-500 font-medium flex items-center gap-1">
             Ara Toplam
           </span>
-          <span className="font-semibold text-slate-800">{subtotal} TL</span>
+          <span className="font-semibold text-slate-800">{subtotal.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
         </div>
         <div className="flex items-center justify-between text-sm">
           <span className="text-slate-500 font-medium">Teslimat / Kargo</span>
@@ -146,8 +151,8 @@ export default function OrderSummaryPanel({ paymentMethod = 'credit_card' }: Ord
         <div className="flex items-center justify-between">
           <span className="text-lg font-black text-slate-900">Toplam</span>
           <div className="text-right">
-            <p className="text-xl font-black text-slate-900">{total} TL</p>
-            <p className="text-xs text-slate-400 font-medium">Vergi {taxAmount} TL</p>
+            <p className="text-xl font-black text-slate-900">{total.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</p>
+            <p className="text-xs text-slate-400 font-medium">Vergi {taxAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</p>
           </div>
         </div>
       </div>

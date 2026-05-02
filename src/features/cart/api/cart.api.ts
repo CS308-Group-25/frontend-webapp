@@ -3,6 +3,7 @@ import apiClient from '@/lib/api-client';
 export interface BulkCartItem {
   product_id: number;
   quantity: number;
+  variant_name?: string;
 }
 
 export interface BulkCartAddResponse {
@@ -14,10 +15,11 @@ export interface BulkCartAddResponse {
  * POST /api/v1/cart/items
  * Adds a single item to the server-side cart.
  */
-export const addCartItem = async (productId: string, quantity: number) => {
+export const addCartItem = async (productId: string, quantity: number, variantName?: string) => {
   return apiClient.post('/v1/cart/items', {
     product_id: parseInt(productId),
-    quantity
+    quantity,
+    variant_name: variantName,
   });
 };
 
