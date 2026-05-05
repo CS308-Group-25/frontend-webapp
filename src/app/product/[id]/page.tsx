@@ -2,7 +2,6 @@
 
 import { use, useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { ChevronRight, Star, Truck, ShieldCheck, Clock, Leaf, WheatOff, Package } from 'lucide-react';
 import {
   fetchProductDetail,
@@ -60,7 +59,6 @@ function RatingStars({ rating, reviewCount }: { rating: number; reviewCount: num
 
 export default function ProductDetailPage(props: { params: Promise<{ id: string }> }) {
   const params = use(props.params);
-  const router = useRouter();
 
   const { data: product, isLoading, isError } = useQuery({
     queryKey: ['product', params.id],
