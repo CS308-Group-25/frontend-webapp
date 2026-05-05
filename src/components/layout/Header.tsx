@@ -20,13 +20,13 @@ import { useCartStore, CartDrawer } from '@/features/cart';
 import { useWishlistStore } from '@/features/wishlist';
 
 const categories = [
-  { label: 'Protein', href: '/search?q=protein' },
-  { label: 'Spor Gıdaları', href: '/search?q=spor' },
-  { label: 'Vitamin', href: '/search?q=vitamin' },
-  { label: 'Amino Asit', href: '/search?q=amino' },
-  { label: 'Sağlık', href: '/search?q=sağlık' },
-  { label: 'Bar & Atıştırmalık', href: '/search?q=bar' },
-  { label: 'Aksesuar', href: '/search?q=aksesuar' },
+  { label: 'Protein Tozu',      href: '/search?q=Protein+Tozu' },
+  { label: 'Spor Gıdaları',     href: '/search?q=Spor+G%C4%B1dalar%C4%B1' },
+  { label: 'Vitamin',           href: '/search?q=Vitamin' },
+  { label: 'Amino Asit',        href: '/search?q=Amino+Asit' },
+  { label: 'Sağlık',            href: '/search?q=Sa%C4%9Fl%C4%B1k' },
+  { label: 'Bar & Atıştırmalık',href: '/search?q=Bar+%26+At%C4%B1%C5%9Ft%C4%B1rmal%C4%B1k' },
+  { label: 'Aksesuar',          href: '/search?q=Aksesuar' },
 ];
 
 export default function Header() {
@@ -53,6 +53,7 @@ export default function Header() {
     e.preventDefault();
     if (searchValue.trim()) {
       router.push(`/search?q=${encodeURIComponent(searchValue.trim())}`);
+      setSearchValue('');
     }
   };
 
@@ -316,4 +317,3 @@ export default function Header() {
     </header>
   );
 }
-

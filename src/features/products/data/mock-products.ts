@@ -14,7 +14,7 @@ export const mockProducts: Product[] = [
     stockStatus: 'in_stock',
     stockCount: 148,
     isNew: true,
-    category: 'Protein',
+    category: 'Protein Tozu',
     tags: ['Vejetaryen', 'Glutensiz'],
     flavors: [
       { id: 'choc', name: 'Çikolata', color: '#5C3317' },
@@ -281,7 +281,7 @@ export const mockProducts: Product[] = [
     stockStatus: 'in_stock',
     stockCount: 89,
     isNew: true,
-    category: 'Protein',
+    category: 'Protein Tozu',
     tags: ['Vejetaryen'],
     flavors: [
       { id: 'choc-cas', name: 'Çikolata', color: '#5C3317' },

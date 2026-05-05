@@ -35,6 +35,8 @@ export interface Product {
 
   isNew?: boolean;
   category?: string;
+  brand?: string;          // Extracted brand from backend
+  subType?: string;        // Product subcategory from backend
   tags?: string[];         // e.g. ["Vejetaryen", "Glutensiz"]
 
   // Variant selectors (detail page)

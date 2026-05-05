@@ -39,13 +39,12 @@ function RatingStars({ rating, reviewCount }: { rating: number; reviewCount: num
           return (
             <Star
               key={i}
-              className={`h-5 w-5 ${
-                filled
-                  ? 'fill-amber-400 text-amber-400'
-                  : half
-                    ? 'fill-amber-400/50 text-amber-400'
-                    : 'fill-slate-200 text-slate-200'
-              }`}
+              className={`h-5 w-5 ${filled
+                ? 'fill-amber-400 text-amber-400'
+                : half
+                  ? 'fill-amber-400/50 text-amber-400'
+                  : 'fill-slate-200 text-slate-200'
+                }`}
             />
           );
         })}
@@ -139,64 +138,64 @@ export default function ProductDetailPage(props: { params: Promise<{ id: string 
   const accordionItems = [
     ...(product.features
       ? [
-          {
-            title: 'Özellikler',
-            content: (
-              <ul className="list-inside list-disc space-y-2">
-                {product.features.map((f, i) => (
-                  <li key={i}>{f}</li>
-                ))}
-              </ul>
-            ),
-          },
-        ]
+        {
+          title: 'Özellikler',
+          content: (
+            <ul className="list-inside list-disc space-y-2">
+              {product.features.map((f, i) => (
+                <li key={i}>{f}</li>
+              ))}
+            </ul>
+          ),
+        },
+      ]
       : []),
     ...(product.nutritionFacts
       ? [
-          {
-            title: 'Besin İçeriği',
-            content: (
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200">
-                    <th className="py-2 font-bold text-slate-800">Besin Değeri</th>
-                    <th className="py-2 font-bold text-slate-800">Porsiyon Başına</th>
-                    {product.nutritionFacts.some((nf) => nf.per100g) && (
-                      <th className="py-2 font-bold text-slate-800">100g Başına</th>
+        {
+          title: 'Besin İçeriği',
+          content: (
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-slate-200">
+                  <th className="py-2 font-bold text-slate-800">Besin Değeri</th>
+                  <th className="py-2 font-bold text-slate-800">Porsiyon Başına</th>
+                  {product.nutritionFacts.some((nf) => nf.per100g) && (
+                    <th className="py-2 font-bold text-slate-800">100g Başına</th>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {product.nutritionFacts.map((nf, i) => (
+                  <tr key={i} className="border-b border-slate-100 last:border-0">
+                    <td className="py-2 text-slate-600">{nf.label}</td>
+                    <td className="py-2 font-semibold text-slate-800">{nf.perServing}</td>
+                    {product.nutritionFacts!.some((n) => n.per100g) && (
+                      <td className="py-2 text-slate-600">{nf.per100g ?? '—'}</td>
                     )}
                   </tr>
-                </thead>
-                <tbody>
-                  {product.nutritionFacts.map((nf, i) => (
-                    <tr key={i} className="border-b border-slate-100 last:border-0">
-                      <td className="py-2 text-slate-600">{nf.label}</td>
-                      <td className="py-2 font-semibold text-slate-800">{nf.perServing}</td>
-                      {product.nutritionFacts!.some((n) => n.per100g) && (
-                        <td className="py-2 text-slate-600">{nf.per100g ?? '—'}</td>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ),
-          },
-        ]
+                ))}
+              </tbody>
+            </table>
+          ),
+        },
+      ]
       : []),
     ...(product.ingredients
       ? [
-          {
-            title: 'İçindekiler',
-            content: <p>{product.ingredients}</p>,
-          },
-        ]
+        {
+          title: 'İçindekiler',
+          content: <p>{product.ingredients}</p>,
+        },
+      ]
       : []),
     ...(product.usage
       ? [
-          {
-            title: 'Kullanım Şekli',
-            content: <p>{product.usage}</p>,
-          },
-        ]
+        {
+          title: 'Kullanım Şekli',
+          content: <p>{product.usage}</p>,
+        },
+      ]
       : []),
   ];
 
@@ -216,47 +215,21 @@ export default function ProductDetailPage(props: { params: Promise<{ id: string 
           Anasayfa
         </Link>
         <ChevronRight className="h-3.5 w-3.5" />
-        <button
-          onClick={() => {
-            const lastQ = sessionStorage.getItem('lastSearchQuery');
-            // If we applied a filter while on "All Products" (lastQ is empty),
-            // use history.back() to ensure filters are preserved when returning.
-            // If we arrived from another category page, navigate cleanly to /search.
-            if (window.history.length > 2 && !lastQ) {
-              window.history.back();
-            } else {
-              router.push('/search');
-            }
-          }}
+        <Link
+          href="/search"
           className="transition-colors hover:text-indigo-600 focus:outline-none"
         >
           Tüm Ürünler
-        </button>
+        </Link>
         {product.category && (
           <>
             <ChevronRight className="h-3.5 w-3.5" />
-            <button
-              onClick={() => {
-                const lastQ = sessionStorage.getItem('lastSearchQuery');
-                if (window.history.length > 2) {
-                  // If lastQ is empty (arrived from "All Products" section),
-                  // navigate directly to a fresh `q=Category` search page
-                  // instead of returning to the previous `?tags=Category` state.
-                  if (!lastQ) {
-                    router.push(`/search?q=${encodeURIComponent(product.category!)}`);
-                  } else {
-                    // If arrived from a specific category where sub-filters (like 'Kreatin') were chosen,
-                    // use history.back() to prevent those filters from resetting.
-                    window.history.back();
-                  }
-                } else {
-                  router.push(`/search?q=${encodeURIComponent(product.category!)}`);
-                }
-              }}
+            <Link
+              href={`/search?q=${encodeURIComponent(product.category)}`}
               className="transition-colors hover:text-indigo-600 focus:outline-none"
             >
               {product.category}
-            </button>
+            </Link>
           </>
         )}
         <ChevronRight className="h-3.5 w-3.5" />
@@ -368,7 +341,7 @@ export default function ProductDetailPage(props: { params: Promise<{ id: string 
               />
             )}
             <div className="flex-1">
-              <AddToCartButton 
+              <AddToCartButton
                 productId={product.id}
                 quantity={quantity}
                 variantId={[selectedFlavor, selectedSize].filter(Boolean).join('-')}

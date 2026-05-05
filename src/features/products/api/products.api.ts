@@ -21,6 +21,7 @@ interface BackendProductRaw {
   rating: string | null;
   review_count: number | null;
   brand: string | null;
+  sub_type: string | null;
   goal_tags: string | null;
   images: string[] | null;
   tags_json: string[] | null;
@@ -48,6 +49,8 @@ const mapBackendToProduct = (item: BackendProductRaw): Product => ({
   stockCount: item.stock,
   isNew: item.is_new ?? undefined,
   category: item.category?.name,
+  brand: item.brand ?? undefined,
+  subType: item.sub_type ?? undefined,
   tags: item.tags_json || (item.goal_tags ? item.goal_tags.split(',') : []),
   flavors: item.flavors_json ?? undefined,
   sizes: item.sizes_json ?? undefined,
@@ -81,4 +84,3 @@ export const fetchProductDetail = async (id: string | number): Promise<Product> 
   const data = await apiClient.get<BackendProductRaw>(`/v1/products/${id}`) as unknown as BackendProductRaw;
   return mapBackendToProduct(data);
 };
-
