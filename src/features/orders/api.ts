@@ -1,15 +1,27 @@
 import apiClient from '@/lib/api-client';
-import { Order, Invoice, OrderStatus } from './types';
+import { Order, Invoice, OrderStatus, RefundRequest, RefundStatus } from './types';
+
+interface RawRefundRequest {
+  id?: number;
+  order_id?: number;
+  order_item_id?: number;
+  product_name?: string;
+  refund_amount?: number | string;
+  status?: string;
+  created_at?: string;
+}
 
 // Raw backend order item shape
 interface RawOrderItem {
   product_id?: number;
   id?: number;
+  order_item_id?: number;
   name?: string;
   quantity?: number;
   price?: number | string;
   unit_price?: number | string;
   variant_name?: string;
+  refund_request?: RawRefundRequest | null;
 }
 
 // Raw backend order shape
@@ -31,12 +43,24 @@ interface RawOrder {
 // Normalise a raw backend order into our frontend Order type
 const normaliseOrder = (raw: RawOrder): Order => {
   const items = ((raw.items ?? raw.order_items ?? []) as RawOrderItem[]).map((item) => ({
+    id: Number(item.id ?? item.order_item_id ?? 0),
     product_id: Number(item.product_id ?? item.id ?? 0),
     name: String(item.name ?? 'Ürün'),
     quantity: Number(item.quantity ?? 1),
     price: Number(item.price ?? item.unit_price ?? 0),
     unit_price: Number(item.unit_price ?? item.price ?? 0),
     variant_name: item.variant_name,
+    refund_request: item.refund_request
+      ? {
+          id: Number(item.refund_request.id ?? 0),
+          order_id: Number(item.refund_request.order_id ?? 0),
+          order_item_id: Number(item.refund_request.order_item_id ?? 0),
+          product_name: String(item.refund_request.product_name ?? ''),
+          refund_amount: Number(item.refund_request.refund_amount ?? 0),
+          status: (item.refund_request.status ?? 'requested') as RefundStatus,
+          created_at: item.refund_request.created_at ?? new Date().toISOString(),
+        }
+      : null,
   }));
 
   const itemsTotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
@@ -109,4 +133,15 @@ export const fetchInvoice = async (orderId: string): Promise<Invoice> => {
 
 export const cancelOrder = async (orderId: string | number): Promise<void> => {
   await apiClient.patch(`/v1/orders/${orderId}`);
+};
+
+export const createRefundRequest = async (
+  orderId: number,
+  itemId: number,
+  reason?: string,
+): Promise<RefundRequest> => {
+  return apiClient.post(
+    `/v1/orders/${orderId}/items/${itemId}/refund-requests`,
+    reason ? { reason } : {},
+  ) as Promise<RefundRequest>;
 };
