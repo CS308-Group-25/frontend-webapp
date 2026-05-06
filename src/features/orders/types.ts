@@ -8,13 +8,32 @@ export type OrderStatus =
   | 'pending'
   | 'confirmed';
 
+export type RefundStatus =
+  | 'requested'
+  | 'approved_waiting_return'
+  | 'returned_received'
+  | 'refunded'
+  | 'rejected';
+
+export interface RefundRequest {
+  id: number;
+  order_id: number;
+  order_item_id: number;
+  product_name: string;
+  refund_amount: number;
+  status: RefundStatus;
+  created_at: string;
+}
+
 export interface OrderItem {
+  id: number;
   product_id: number;
   name: string;
   quantity: number;
   price: number;
   unit_price?: number;
   variant_name?: string;
+  refund_request?: RefundRequest | null;
 }
 
 export interface InvoiceItem {
