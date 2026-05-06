@@ -14,6 +14,8 @@ interface AddToCartButtonProps {
   price?: number;
   /** Product image URL — stored in localStorage so the image shows before products are fetched */
   image?: string;
+  /** Current stock count for client-side quantity limits */
+  stockCount?: number;
   /** Selected flavor name to display in the cart */
   flavor?: string;
   /** Selected size name to display in the cart */
@@ -30,6 +32,7 @@ export default function AddToCartButton({
   name,
   price,
   image,
+  stockCount,
   flavor,
   size,
   onClick,
@@ -41,7 +44,7 @@ export default function AddToCartButton({
       onClick(e);
       if (e.defaultPrevented) return;
     }
-    addItem(productId, quantity, variantId, { name, price, image, flavor, size });
+    addItem(productId, quantity, variantId, { name, price, image, flavor, size, stockCount });
     openDrawer();
   };
 

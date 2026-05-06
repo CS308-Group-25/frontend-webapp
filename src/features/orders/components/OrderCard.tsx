@@ -39,7 +39,7 @@ export default function OrderCard({ order }: OrderCardProps) {
   const openDrawer = useCartStore((state) => state.openDrawer);
 
   // Look up product images from the catalogue cache
-  const { data } = useQuery({
+  const { data, isLoading: isProductsLoading } = useQuery({
     queryKey: ['products', 'all'],
     queryFn: () => fetchProducts(200),
   });
@@ -69,7 +69,8 @@ export default function OrderCard({ order }: OrderCardProps) {
         await addItem(String(item.product_id), item.quantity, undefined, {
           name: cachedProduct?.name ?? item.name,
           price: cachedProduct?.price ?? item.price,
-          image: cachedProduct?.image || (cachedProduct?.images && cachedProduct.images[0]) || '/placeholder.png'
+          image: cachedProduct?.image || (cachedProduct?.images && cachedProduct.images[0]) || '/placeholder.png',
+          stockCount: cachedProduct?.stockCount,
         });
       }
       toast.success('Siparişinizdeki ürünler sepete eklendi!');
@@ -157,7 +158,7 @@ export default function OrderCard({ order }: OrderCardProps) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-4 border-t border-slate-50">
         <button
           onClick={handleReorder}
-          disabled={isReordering}
+          disabled={isReordering || isProductsLoading}
           className="flex items-center justify-center gap-2 px-3 py-2.5 border border-slate-200 text-slate-700 text-xs sm:text-sm font-bold rounded-xl hover:border-indigo-300 hover:text-indigo-600 transition-colors disabled:opacity-70 disabled:cursor-not-allowed whitespace-nowrap"
         >
           {isReordering && <Loader2 className="w-3.5 h-3.5 animate-spin" />}

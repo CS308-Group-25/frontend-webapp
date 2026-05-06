@@ -347,6 +347,7 @@ export default function ProductDetailPage(props: { params: Promise<{ id: string 
                 name={product.name}
                 price={product.price}
                 image={product.image || (product.images && product.images[0]) || '/placeholder.png'}
+                stockCount={product.stockCount}
                 flavor={product.flavors?.find(f => f.id === selectedFlavor)?.name}
                 size={product.sizes?.find(s => s.id === selectedSize)?.label}
                 onClick={(e) => {

@@ -36,6 +36,10 @@ export interface Product {
   isNew?: boolean;
   category?: string;
   brand?: string;          // Extracted brand from backend
+  model?: string;
+  serialNumber?: string;
+  warrantyStatus?: string;
+  distributor?: string;
   subType?: string;        // Product subcategory from backend
   tags?: string[];         // e.g. ["Vejetaryen", "Glutensiz"]
 
