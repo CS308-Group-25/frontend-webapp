@@ -70,11 +70,13 @@ function NewBadge({ compact = false }: { compact?: boolean }) {
 export default function ProductCard({ product }: ProductCardProps) {
   const { addItem, openDrawer } = useCartStore();
   const isOutOfStock = product.stockStatus === 'out_of_stock' || product.stockCount === 0;
-  const hasVariantData = Array.isArray(product.flavors) && Array.isArray(product.sizes);
-  const singleFlavor = hasVariantData && product.flavors.length === 1 ? product.flavors[0] : undefined;
-  const singleSize = hasVariantData && product.sizes.length === 1 ? product.sizes[0] : undefined;
-  const hasAmbiguousFlavor = hasVariantData && product.flavors.length > 1;
-  const hasAmbiguousSize = hasVariantData && product.sizes.length > 1;
+  const flavors = Array.isArray(product.flavors) ? product.flavors : undefined;
+  const sizes = Array.isArray(product.sizes) ? product.sizes : undefined;
+  const hasVariantData = Boolean(flavors && sizes);
+  const singleFlavor = flavors?.length === 1 ? flavors[0] : undefined;
+  const singleSize = sizes?.length === 1 ? sizes[0] : undefined;
+  const hasAmbiguousFlavor = Boolean(flavors && flavors.length > 1);
+  const hasAmbiguousSize = Boolean(sizes && sizes.length > 1);
   const canQuickAdd = !isOutOfStock && hasVariantData && !hasAmbiguousFlavor && !hasAmbiguousSize;
   const displayPrice = singleSize?.price ?? product.price;
   const displayOriginalPrice = singleSize?.originalPrice ?? product.originalPrice;
@@ -91,6 +93,7 @@ export default function ProductCard({ product }: ProductCardProps) {
       image: product.image || product.images?.[0] || '/placeholder.png',
       flavor: singleFlavor?.name,
       size: singleSize?.label,
+      stockCount: product.stockCount,
     });
     openDrawer();
   };

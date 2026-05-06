@@ -7,7 +7,13 @@ export interface BulkCartItem {
 }
 
 export interface BulkCartAddResponse {
-  added: { id: number; cart_id: number; product_id: number; quantity: number }[];
+  added: {
+    id: number;
+    cart_id: number;
+    product_id: number;
+    quantity: number;
+    variant_name?: string | null;
+  }[];
   rejected: { product_id: number; reason: string }[];
 }
 

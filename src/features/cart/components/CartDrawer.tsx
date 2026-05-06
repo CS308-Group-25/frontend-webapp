@@ -4,11 +4,12 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { X, Trash2, Plus, Minus, ShoppingBag } from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
+import { X, Trash2, ShoppingBag } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCartStore } from '../store/cart.store';
 import { useAuthStore } from '@/features/auth';
-import type { PaginatedProductResponse } from '@/features/products';
+import { fetchProducts, type PaginatedProductResponse } from '@/features/products';
+import QuantitySelector from '@/features/products/components/QuantitySelector';
 
 export const CartDrawer = () => {
   const {
@@ -26,7 +27,13 @@ export const CartDrawer = () => {
   // This avoids an extra API call since the search page already populated the cache.
   const queryClient = useQueryClient();
   const cachedData = queryClient.getQueryData<PaginatedProductResponse>(['products', 'all']);
-  const cachedProducts = cachedData?.items ?? [];
+  const { data: productData } = useQuery({
+    queryKey: ['products', 'all'],
+    queryFn: () => fetchProducts(200),
+    enabled: isDrawerOpen && items.length > 0,
+    initialData: cachedData,
+  });
+  const cachedProducts = productData?.items ?? [];
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -57,6 +64,7 @@ export const CartDrawer = () => {
       productName: cartItem.name || product?.name || 'Ürün',
       productPrice: cartItem.price ?? product?.price ?? 0,
       productImage: cartItem.image || product?.image || '/placeholder.png',
+      stockCount: cartItem.stockCount ?? product?.stockCount,
     };
   });
 
@@ -154,23 +162,11 @@ export const CartDrawer = () => {
                     
                     <div className="mt-auto flex items-center justify-between">
                       {/* Quantity Selector */}
-                      <div className="flex items-center rounded-lg border border-slate-200 bg-white">
-                        <button
-                          onClick={() => updateItem(item.productId, item.quantity - 1, item.cartItemId)}
-                          className="p-1.5 text-slate-500 transition-colors hover:bg-slate-50 hover:text-indigo-600 focus:outline-none"
-                        >
-                          <Minus className="h-3.5 w-3.5" />
-                        </button>
-                        <span className="w-8 text-center text-sm font-semibold text-slate-700">
-                          {item.quantity}
-                        </span>
-                        <button
-                          onClick={() => updateItem(item.productId, item.quantity + 1, item.cartItemId)}
-                          className="p-1.5 text-slate-500 transition-colors hover:bg-slate-50 hover:text-indigo-600 focus:outline-none"
-                        >
-                          <Plus className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
+                      <QuantitySelector
+                        quantity={item.quantity}
+                        max={item.stockCount ?? 99}
+                        onChange={(quantity) => updateItem(item.productId, quantity, item.cartItemId, item.stockCount)}
+                      />
 
                       <div className="text-right">
                         <p className="font-black text-slate-900">

@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { addCartItem, bulkAddCartItems, fetchCartItems, updateCartItem as apiUpdateCartItem, removeCartItem as apiRemoveCartItem } from '../api/cart.api';
 import { useAuthStore } from '@/features/auth';
 import { toast } from 'sonner';
+import { fetchProductDetail } from '@/features/products/api/products.api';
 
 /**
  * Represents a single item in the cart.
@@ -26,6 +27,17 @@ export interface CartItem {
   flavor?: string;
   /** Selected size name */
   size?: string;
+  /** Current stock count for client-side quantity limits */
+  stockCount?: number;
+}
+
+interface CartItemMeta {
+  name?: string;
+  price?: number;
+  image?: string;
+  flavor?: string;
+  size?: string;
+  stockCount?: number;
 }
 
 /** Zustand state for the guest cart */
@@ -37,9 +49,9 @@ interface CartState {
   /** Persistent flag to avoid redundant merge attempts for the same set of items */
   mergeAttempted: boolean;
   /** Add a product (or increase quantity) */
-  addItem: (productId: string, quantity?: number, variantId?: string, meta?: { name?: string; price?: number; image?: string; flavor?: string; size?: string }) => Promise<void>;
+  addItem: (productId: string, quantity?: number, variantId?: string, meta?: CartItemMeta) => Promise<void>;
   /** Update quantity of a product */
-  updateItem: (productId: string, quantity: number, cartItemId?: number) => Promise<void>;
+  updateItem: (productId: string, quantity: number, cartItemId?: number, maxQuantity?: number) => Promise<void>;
   /** Remove a product from the cart */
   removeItem: (productId: string, cartItemId?: number) => Promise<void>;
   /** Clear the entire cart */
@@ -66,12 +78,19 @@ interface CartItemServerResponse {
   quantity: number;
   variant_name: string | null;
   product_name?: string;
-  product_price?: number;
+  product_price?: number | string;
   product_image?: string;
 }
 
+const buildVariantNamePayload = (item: Pick<CartItem, 'flavor' | 'size' | 'variantId'>) => (
+  item.flavor || item.size || item.variantId
+    ? JSON.stringify({ flavor: item.flavor, size: item.size, variantId: item.variantId })
+    : undefined
+);
 
-
+const isSameVariantPayload = (left?: string | null, right?: string | null) => (
+  (left ?? null) === (right ?? null)
+);
 
 export const useCartStore = create<CartState>()(
   persist(
@@ -90,7 +109,21 @@ export const useCartStore = create<CartState>()(
 
         try {
           const serverItems = (await fetchCartItems()) as unknown as CartItemServerResponse[];
+          const productDetails = await Promise.all(
+            [...new Set(serverItems.map((item) => item.product_id))].map(async (productId) => {
+              try {
+                const product = await fetchProductDetail(productId);
+                return [String(productId), product] as const;
+              } catch (error) {
+                console.error(`[CartStore] Failed to fetch product ${productId}:`, error);
+                return [String(productId), null] as const;
+              }
+            }),
+          );
+          const productsById = new Map(productDetails);
+
           const mappedItems: CartItem[] = serverItems.map((item) => {
+            const product = productsById.get(String(item.product_id));
             let flavor, size, variantId;
             if (item.variant_name) {
               try {
@@ -112,11 +145,12 @@ export const useCartStore = create<CartState>()(
               quantity: item.quantity,
               cartItemId: item.id,
               variantId: variantId,
-              name: item.product_name || `Ürün ${item.product_id}`,
-              price: item.product_price || 0,
-              image: item.product_image || '/placeholder.png',
+              name: item.product_name || product?.name || `Ürün ${item.product_id}`,
+              price: Number(item.product_price ?? product?.price) || 0,
+              image: item.product_image || product?.image || '/placeholder.png',
               flavor,
               size,
+              stockCount: product?.stockCount,
             };
           });
           
@@ -136,6 +170,27 @@ export const useCartStore = create<CartState>()(
           (i) => i.productId === productId && i.variantId === variantId,
         );
 
+        const maxStock = meta?.stockCount ?? existing?.stockCount;
+        const availableToAdd = typeof maxStock === 'number' ? maxStock - (existing?.quantity ?? 0) : undefined;
+
+        if (typeof maxStock === 'number' && maxStock <= 0) {
+          toast.error('Bu ürün stokta yok.');
+          return;
+        }
+
+        if (typeof availableToAdd === 'number' && availableToAdd <= 0) {
+          toast.warning('Bu üründen stokta daha fazla yok.');
+          return;
+        }
+
+        const safeQuantity = typeof availableToAdd === 'number'
+          ? Math.min(quantity, availableToAdd)
+          : quantity;
+
+        if (safeQuantity < quantity) {
+          toast.warning(`Stokta en fazla ${maxStock} adet var.`);
+        }
+
         const previousItems = [...items]; // Save for rollback
 
         // Optimistic State Update
@@ -143,14 +198,14 @@ export const useCartStore = create<CartState>()(
           set({
             items: items.map((i) =>
               i.productId === productId && i.variantId === variantId
-                ? { ...i, quantity: i.quantity + quantity, ...meta }
+                ? { ...i, quantity: i.quantity + safeQuantity, ...meta }
                 : i,
             ),
             mergeAttempted: false,
           });
         } else {
           set({
-            items: [...items, { productId, quantity, variantId, ...meta }],
+            items: [...items, { productId, quantity: safeQuantity, variantId, ...meta }],
             mergeAttempted: false,
           });
         }
@@ -160,14 +215,12 @@ export const useCartStore = create<CartState>()(
           try {
             if (existing && existing.cartItemId) {
               // Item exists on server, update its quantity
-              const newQuantity = existing.quantity + quantity;
+              const newQuantity = existing.quantity + safeQuantity;
               await apiUpdateCartItem(existing.cartItemId, newQuantity);
             } else {
               // Item is completely new on server
-              const variantNamePayload = (meta?.flavor || meta?.size || variantId) 
-                ? JSON.stringify({ flavor: meta?.flavor, size: meta?.size, variantId }) 
-                : undefined;
-              const response = (await addCartItem(productId, quantity, variantNamePayload)) as unknown as CartItemServerResponse;
+              const variantNamePayload = buildVariantNamePayload({ flavor: meta?.flavor, size: meta?.size, variantId });
+              const response = (await addCartItem(productId, safeQuantity, variantNamePayload)) as unknown as CartItemServerResponse;
               // Add the new cartItemId to our optimistically created local item
               set({
                 items: get().items.map((i) => 
@@ -188,7 +241,7 @@ export const useCartStore = create<CartState>()(
         }
       },
 
-      updateItem: async (productId, quantity, cartItemId?: number) => {
+      updateItem: async (productId, quantity, cartItemId?: number, maxQuantity?: number) => {
         if (quantity <= 0) {
           await get().removeItem(productId, cartItemId);
           return;
@@ -203,6 +256,12 @@ export const useCartStore = create<CartState>()(
           : items.find((i) => i.productId === productId);
           
         if (!targetItem) return;
+
+        const stockLimit = maxQuantity ?? targetItem.stockCount;
+        if (typeof stockLimit === 'number' && quantity > stockLimit) {
+          toast.warning(`Stokta en fazla ${stockLimit} adet var.`);
+          return;
+        }
 
         const previousItems = [...items]; // Save for rollback
 
@@ -225,7 +284,7 @@ export const useCartStore = create<CartState>()(
           }
         } else if (isAuth && !targetItem.cartItemId) {
           try {
-             const response = (await addCartItem(productId, quantity)) as unknown as CartItemServerResponse;
+             const response = (await addCartItem(productId, quantity, buildVariantNamePayload(targetItem))) as unknown as CartItemServerResponse;
              set({
                 items: get().items.map((i) => 
                   i === targetItem
@@ -289,19 +348,28 @@ export const useCartStore = create<CartState>()(
           return;
         }
 
+        const unsyncedItems = items.filter((item) => !item.cartItemId);
+        if (unsyncedItems.length === 0) {
+          await fetchServerCart();
+          return;
+        }
+
         set({ isMerging: true });
 
         try {
           // Build bulk payload from local guest cart
-          const bulkItems = items
+          const bulkItems = unsyncedItems
             .map((item) => ({
               product_id: parseInt(item.productId),
               quantity: item.quantity,
-              variant_name: (item.flavor || item.size || item.variantId) 
-                ? JSON.stringify({ flavor: item.flavor, size: item.size, variantId: item.variantId }) 
-                : undefined,
+              variant_name: buildVariantNamePayload(item),
             }))
             .filter((i) => !isNaN(i.product_id) && i.product_id > 0);
+
+          if (bulkItems.length === 0) {
+            await fetchServerCart();
+            return;
+          }
 
           const result = await bulkAddCartItems(bulkItems);
 
@@ -309,6 +377,7 @@ export const useCartStore = create<CartState>()(
           const updatedLocalItems = items.map((localItem) => {
             const added = result.added.find(
               (a) => String(a.product_id) === localItem.productId
+                && isSameVariantPayload(a.variant_name, buildVariantNamePayload(localItem))
             );
             return added ? { ...localItem, cartItemId: added.id } : localItem;
           });

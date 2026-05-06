@@ -10,7 +10,7 @@ import { useQuery } from '@tanstack/react-query';
 type SortOption = 'default' | 'price-asc' | 'price-desc' | 'rating' | 'reviews';
 
 const sortLabels: Record<SortOption, string> = {
-  default: 'Önerilen',
+  default: 'Varsayılan',
   'price-asc': 'Fiyat: Düşükten Yükseğe',
   'price-desc': 'Fiyat: Yüksekten Düşüğe',
   rating: 'En Yüksek Puan',

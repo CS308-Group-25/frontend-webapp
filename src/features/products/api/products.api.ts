@@ -12,8 +12,12 @@ export interface PaginatedProductResponse {
 interface BackendProductRaw {
   id: number;
   name: string;
+  model: string | null;
+  serial_no: string | null;
   description: string | null;
   price: string | null;
+  warranty: string | null;
+  distributor: string | null;
   original_price: string | null;
   stock: number;
   stock_status: string | null;
@@ -50,7 +54,11 @@ const mapBackendToProduct = (item: BackendProductRaw): Product => ({
   isNew: item.is_new ?? undefined,
   category: item.category?.name,
   brand: item.brand ?? undefined,
-  subType: item.sub_type ?? undefined,
+  model: item.model ?? undefined,
+  serialNumber: item.serial_no ?? undefined,
+  warrantyStatus: item.warranty ?? undefined,
+  distributor: item.distributor ?? undefined,
+  subType: item.sub_type ?? item.model ?? undefined,
   tags: item.tags_json || (item.goal_tags ? item.goal_tags.split(',') : []),
   flavors: item.flavors_json ?? undefined,
   sizes: item.sizes_json ?? undefined,
