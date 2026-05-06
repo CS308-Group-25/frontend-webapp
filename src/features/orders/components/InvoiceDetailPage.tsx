@@ -46,6 +46,35 @@ function formatCurrency(amount: number) {
   }).format(safeAmount);
 }
 
+function normalizePhone(phone: string) {
+  const digits = phone.replace(/\D/g, '');
+  const withoutCountryCode = digits.startsWith('90') && digits.length > 10 ? digits.slice(2) : digits;
+  const localPhone = withoutCountryCode.startsWith('0') ? withoutCountryCode.slice(1) : withoutCountryCode;
+
+  if (localPhone.length !== 10) return phone.trim();
+  return `+90 ${localPhone.slice(0, 3)} ${localPhone.slice(3, 6)} ${localPhone.slice(6, 8)} ${localPhone.slice(8)}`;
+}
+
+function splitAddressAndPhone(deliveryAddress: string) {
+  const parts = deliveryAddress.split(',').map((part) => part.trim()).filter(Boolean);
+  const phoneIndex = parts.findIndex((part) => {
+    const digits = part.replace(/\D/g, '');
+    return digits.length >= 10 && digits.length <= 12;
+  });
+
+  if (phoneIndex === -1) {
+    return {
+      address: deliveryAddress,
+      phone: '',
+    };
+  }
+
+  const phone = normalizePhone(parts[phoneIndex]);
+  const address = parts.filter((_, index) => index !== phoneIndex).join(', ');
+
+  return { address, phone };
+}
+
 export default function InvoiceDetailPage({ orderId }: InvoiceDetailPageProps) {
   const {
     data: invoice,
@@ -59,6 +88,9 @@ export default function InvoiceDetailPage({ orderId }: InvoiceDetailPageProps) {
   });
 
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const invoiceAddress = invoice
+    ? splitAddressAndPhone(invoice.delivery_address)
+    : { address: '', phone: '' };
 
   const handlePrint = () => {
     window.print();
@@ -238,8 +270,10 @@ export default function InvoiceDetailPage({ orderId }: InvoiceDetailPageProps) {
                 </div>
                 <div className="space-y-1.5">
                   <p className="font-bold text-slate-900 text-lg">{invoice.customer_name}</p>
-                  <p className="text-slate-600">+90 532 000 00 00</p>
-                  <p className="text-slate-600">{invoice.delivery_address}</p>
+                  {invoiceAddress.phone && (
+                    <p className="text-slate-600">{invoiceAddress.phone}</p>
+                  )}
+                  <p className="text-slate-600">{invoiceAddress.address}</p>
                   <p className="text-slate-600">Türkiye</p>
                 </div>
               </div>
