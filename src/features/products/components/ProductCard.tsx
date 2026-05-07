@@ -10,9 +10,24 @@ interface ProductCardProps {
   product: Product;
 }
 
-function RatingStars({ rating, reviewCount }: { rating: number; reviewCount: number }) {
+function RatingStars({
+  rating,
+  reviewCount,
+  commentCount,
+}: {
+  rating: number;
+  reviewCount: number;
+  commentCount: number;
+}) {
+  const hasRating = rating > 0 && reviewCount > 0;
+
   return (
     <div className="flex items-center gap-1.5">
+      {hasRating && (
+        <span className="text-xs font-extrabold text-slate-700">
+          {rating.toFixed(1)}
+        </span>
+      )}
       <div className="flex items-center gap-0.5">
         {Array.from({ length: 5 }).map((_, i) => {
           const filled = i < Math.floor(rating);
@@ -31,7 +46,9 @@ function RatingStars({ rating, reviewCount }: { rating: number; reviewCount: num
         })}
       </div>
       <span className="text-xs font-medium text-slate-400">
-        {reviewCount > 0 ? `${reviewCount} Yorum` : 'Henüz yorum yok'}
+        {hasRating
+          ? `· ${reviewCount} Değerlendirme ${commentCount} Yorum`
+          : 'Henüz değerlendirme yok'}
       </span>
     </div>
   );
@@ -166,7 +183,11 @@ export default function ProductCard({ product }: ProductCardProps) {
         </div>
 
         {/* Rating */}
-        <RatingStars rating={product.rating} reviewCount={product.reviewCount} />
+        <RatingStars
+          rating={product.rating}
+          reviewCount={product.reviewCount}
+          commentCount={product.commentCount ?? 0}
+        />
 
         {/* Price & Stock */}
         <div className="mt-auto flex items-end justify-between pt-2">

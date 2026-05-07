@@ -30,6 +30,7 @@ export interface Product {
   images?: string[];      // Gallery images for detail page
   rating: number; // 0–5
   reviewCount: number;
+  commentCount?: number;
   stockStatus: StockStatus;
   stockCount?: number; // Shown when status is low_stock or as explicit count
 
