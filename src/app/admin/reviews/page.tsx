@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { MessageSquare, Loader2, RefreshCw } from 'lucide-react';
 import ReviewModerationTable from '@/features/admin/reviews/components/ReviewModerationTable';
 import { fetchAdminReviews, moderateReview, deleteReview } from '@/features/admin/reviews/api';
-import { mockReviews } from '@/features/admin/reviews/data/mock-reviews';
 import { AdminReview, ReviewApprovalStatus } from '@/features/admin/reviews/types';
 
 const STATUS_TABS: { value: ReviewApprovalStatus | 'all'; label: string }[] = [
@@ -18,15 +17,17 @@ const STATUS_TABS: { value: ReviewApprovalStatus | 'all'; label: string }[] = [
 export default function AdminReviewsPage() {
   const [reviews, setReviews] = useState<AdminReview[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [activeTab, setActiveTab] = useState<ReviewApprovalStatus | 'all'>('pending');
 
   const loadReviews = () => {
     setLoading(true);
+    setError(false);
     fetchAdminReviews()
       .then(setReviews)
       .catch(() => {
-        console.warn('API unavailable, using mock data');
-        setReviews(mockReviews);
+        setReviews([]);
+        setError(true);
       })
       .finally(() => setLoading(false));
   };
@@ -35,8 +36,8 @@ export default function AdminReviewsPage() {
     fetchAdminReviews()
       .then(setReviews)
       .catch(() => {
-        console.warn('API unavailable, using mock data');
-        setReviews(mockReviews);
+        setReviews([]);
+        setError(true);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -168,6 +169,14 @@ export default function AdminReviewsPage() {
             <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
             <p className="text-sm font-medium text-slate-500">Yorumlar yükleniyor...</p>
           </div>
+        </div>
+      ) : error ? (
+        <div className="flex min-h-[400px] flex-col items-center justify-center rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-red-100">
+          <div className="mb-4 rounded-2xl bg-red-50 p-4">
+            <MessageSquare className="h-10 w-10 text-red-300" />
+          </div>
+          <p className="text-lg font-bold text-red-600">Yorumlar yüklenemedi.</p>
+          <p className="mt-1 text-sm text-red-400">Lütfen backend bağlantısını kontrol edip tekrar deneyin.</p>
         </div>
       ) : (
         <ReviewModerationTable

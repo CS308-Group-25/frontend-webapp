@@ -14,6 +14,8 @@ import {
   Search,
   ShoppingCart,
   Heart,
+  ClipboardList,
+  MessageSquare,
 } from 'lucide-react';
 import { useAuthStore, logoutUser } from '@/features/auth';
 import { useCartStore, CartDrawer } from '@/features/cart';
@@ -35,8 +37,10 @@ export default function Header() {
   const { items: wishlistItems } = useWishlistStore();
   const router = useRouter();
   const [searchValue, setSearchValue] = useState('');
+  const [isProductManagerPanelOpen, setIsProductManagerPanelOpen] = useState(false);
 
   const itemCount = cartItems.reduce((total, item) => total + item.quantity, 0);
+  const isProductManager = isAuthenticated && user?.role === 'product_manager';
 
   const handleLogout = async () => {
     try {
@@ -290,16 +294,16 @@ export default function Header() {
       </div>
 
       {/* Category Navigation */}
-      <nav className="border-t border-slate-50 bg-white/60 backdrop-blur-sm">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="scrollbar-hide flex items-center gap-1 overflow-x-auto py-2">
+      <nav className="relative border-t border-slate-50 bg-white/60 backdrop-blur-sm">
+        <div className="mx-auto max-w-7xl px-4 py-2 sm:px-6 lg:px-8">
+          <div className="scrollbar-hide flex items-center gap-1 overflow-x-auto lg:overflow-visible">
             <Link
               href="/search"
               className="shrink-0 rounded-lg px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-indigo-600 transition-all hover:bg-indigo-50"
             >
               Tüm Ürünler
             </Link>
-            <div className="h-4 w-px bg-slate-200" />
+            <div className="h-4 w-px shrink-0 bg-slate-200" />
             {categories.map((cat) => (
               <Link
                 key={cat.label}
@@ -309,6 +313,46 @@ export default function Header() {
                 {cat.label}
               </Link>
             ))}
+            {isProductManager && (
+              <>
+                <div className="h-4 w-px shrink-0 bg-slate-200" />
+                <div className="relative shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsProductManagerPanelOpen((current) => !current)}
+                    className="flex items-center gap-1.5 rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-600 transition-all hover:bg-indigo-100 focus:outline-none"
+                    aria-expanded={isProductManagerPanelOpen}
+                  >
+                    Product Manager Panel
+                    <ChevronDown
+                      className={`h-3.5 w-3.5 transition-transform ${
+                        isProductManagerPanelOpen ? 'rotate-180' : ''
+                      }`}
+                    />
+                  </button>
+                  {isProductManagerPanelOpen && (
+                    <div className="absolute left-0 top-full z-50 mt-2 w-56 rounded-xl border border-slate-100 bg-white p-1.5 shadow-xl shadow-indigo-500/10">
+                      <Link
+                        href="/admin/reviews"
+                        onClick={() => setIsProductManagerPanelOpen(false)}
+                        className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold text-slate-700 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
+                      >
+                        <MessageSquare className="h-4 w-4" />
+                        Product Reviews
+                      </Link>
+                      <Link
+                        href="/admin/orders"
+                        onClick={() => setIsProductManagerPanelOpen(false)}
+                        className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold text-slate-700 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
+                      >
+                        <ClipboardList className="h-4 w-4" />
+                        Product Orders
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </div>
       </nav>

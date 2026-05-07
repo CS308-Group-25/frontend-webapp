@@ -14,7 +14,7 @@ const sortLabels: Record<SortOption, string> = {
   'price-asc': 'Fiyat: Düşükten Yükseğe',
   'price-desc': 'Fiyat: Yüksekten Düşüğe',
   rating: 'En Yüksek Puan',
-  reviews: 'En Çok Yorumlanan',
+  reviews: 'En Popüler',
 };
 
 const normalizeFilterValue = (value?: string) => value?.trim().toLocaleLowerCase('tr-TR') ?? '';
@@ -221,7 +221,7 @@ function SearchContent() {
       filtered.sort((a, b) => b.rating - a.rating);
       break;
     case 'reviews':
-      filtered.sort((a, b) => b.reviewCount - a.reviewCount);
+      filtered.sort((a, b) => (b.commentCount ?? 0) - (a.commentCount ?? 0));
       break;
   }
 

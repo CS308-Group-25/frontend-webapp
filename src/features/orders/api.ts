@@ -80,7 +80,9 @@ const normaliseOrder = (raw: RawOrder): Order => {
 export const fetchOrders = async (): Promise<Order[]> => {
   const raw = await apiClient.get('/v1/orders') as unknown as RawOrder[];
   const orders = Array.isArray(raw) ? raw : [];
-  return orders.map(normaliseOrder);
+  return orders
+    .map(normaliseOrder)
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 };
 
 export const fetchOrderById = async (id: string): Promise<Order> => {

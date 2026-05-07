@@ -17,10 +17,11 @@ export interface ProductReview {
   id: number;
   product_id: number;
   user_id: number;
-  rating: number;
+  rating: number | null;
   comment: string | null;
   approval_status: string;
   created_at: string;
+  customer_name?: string | null;
 }
 
 // Raw response shape as returned by the FastAPI backend (snake_case)
@@ -120,5 +121,8 @@ export const submitProductReview = async (
 export const fetchProductReviews = async (
   productId: string | number,
 ): Promise<ProductReview[]> => {
-  return apiClient.get(`/v1/products/${productId}/reviews`) as unknown as ProductReview[];
+  const reviews = await apiClient.get(`/v1/products/${productId}/reviews`) as unknown as ProductReview[];
+  return [...reviews].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  );
 };
