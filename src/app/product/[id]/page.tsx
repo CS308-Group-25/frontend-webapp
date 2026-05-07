@@ -4,7 +4,9 @@ import { use, useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { ChevronRight, Star, Truck, ShieldCheck, Clock, Leaf, WheatOff, Package } from 'lucide-react';
 import {
+  fetchProductReviews,
   fetchProductDetail,
+  submitProductReview,
   ProductImageGallery,
   FlavorSelector,
   SizeSelector,
@@ -13,9 +15,13 @@ import {
   ProductAccordion,
   StockBadge
 } from '@/features/products';
-import { useQuery } from '@tanstack/react-query';
+import type { ProductReview } from '@/features/products/api/products.api';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import WishlistButton from '@/features/wishlist/components/WishlistButton';
 import { toast } from 'sonner';
+import { useAuthStore } from '@/features/auth';
+import { fetchOrders } from '@/features/orders/api';
+import type { Order } from '@/features/orders/types';
 
 
 /* ──────────────────────── Tag Badge Mapping ──────────────────────── */
@@ -28,9 +34,24 @@ const tagIcons: Record<string, React.ReactNode> = {
 
 /* ──────────────────────── Rating Stars (shared) ──────────────────── */
 
-function RatingStars({ rating, reviewCount }: { rating: number; reviewCount: number }) {
+function RatingStars({
+  rating,
+  reviewCount,
+  commentCount,
+}: {
+  rating: number;
+  reviewCount: number;
+  commentCount: number;
+}) {
+  const hasRating = rating > 0 && reviewCount > 0;
+
   return (
     <div className="flex items-center gap-2">
+      {hasRating && (
+        <span className="text-sm font-extrabold text-slate-900">
+          {rating.toFixed(1)}
+        </span>
+      )}
       <div className="flex items-center gap-0.5">
         {Array.from({ length: 5 }).map((_, i) => {
           const filled = i < Math.floor(rating);
@@ -49,8 +70,292 @@ function RatingStars({ rating, reviewCount }: { rating: number; reviewCount: num
         })}
       </div>
       <span className="text-sm font-bold text-slate-700">
-        {reviewCount > 0 ? `${reviewCount.toLocaleString('tr-TR')} Yorum` : 'Henüz yorum yok'}
+        {hasRating
+          ? `· ${reviewCount.toLocaleString('tr-TR')} Değerlendirme ${commentCount.toLocaleString('tr-TR')} Yorum`
+          : 'Henüz değerlendirme yok'}
       </span>
+    </div>
+  );
+}
+
+function ReviewForm({
+  productId,
+  isAuthenticated,
+  onSubmitted,
+}: {
+  productId: string;
+  isAuthenticated: boolean;
+  onSubmitted: () => void;
+}) {
+  const [rating, setRating] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);
+  const [comment, setComment] = useState('');
+
+  const ratingMutation = useMutation({
+    mutationFn: () => submitProductReview(productId, { rating }),
+    onSuccess: () => {
+      toast.success('Değerlendirmeniz alındı.');
+      setRating(0);
+      setHoverRating(0);
+      onSubmitted();
+    },
+    onError: (error) => {
+      toast.error(typeof error === 'string' ? error : 'Değerlendirme gönderilemedi.');
+    },
+  });
+
+  const commentMutation = useMutation({
+    mutationFn: () => submitProductReview(productId, {
+      comment: comment.trim(),
+    }),
+    onSuccess: () => {
+      toast.success('Yorumunuz alındı. Onaydan sonra yayınlanacaktır.');
+      setComment('');
+      onSubmitted();
+    },
+    onError: (error) => {
+      toast.error(typeof error === 'string' ? error : 'Yorum gönderilemedi.');
+    },
+  });
+
+  const activeRating = hoverRating || rating;
+
+  if (!isAuthenticated) {
+    return (
+      <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+        <h2 className="text-xl font-extrabold text-slate-900">Ürünü Değerlendir</h2>
+        <p className="mt-2 text-sm font-medium text-slate-500">
+          Değerlendirme yapmak ve yorum yazmak için giriş yapmanız gerekiyor.
+        </p>
+        <Link
+          href="/auth/login"
+          className="mt-4 inline-flex rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white transition-all hover:bg-indigo-700 active:scale-95"
+        >
+          Giriş Yap
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-xl font-extrabold text-slate-900">Ürünü Değerlendir</h2>
+        <p className="text-sm font-medium text-slate-500">
+          Yıldız puanınız hemen değerlendirmeye eklenir. Yorumu ayrıca gönderebilirsiniz.
+        </p>
+      </div>
+
+      <div className="mt-5 rounded-xl border border-slate-100 bg-slate-50 p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-sm font-extrabold text-slate-900">Puan Ver</h3>
+            <p className="mt-0.5 text-xs font-medium text-slate-500">
+              Sadece yıldız puanı gönderilir.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1" onMouseLeave={() => setHoverRating(0)}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  type="button"
+                  onMouseEnter={() => setHoverRating(star)}
+                  onFocus={() => setHoverRating(star)}
+                  onBlur={() => setHoverRating(0)}
+                  onClick={() => setRating(star)}
+                  className="rounded-md p-0.5 transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-amber-200"
+                  aria-label={`${star} yıldız ver`}
+                >
+                  <Star
+                    className={`h-8 w-8 ${
+                      star <= activeRating
+                        ? 'fill-amber-400 text-amber-400'
+                        : 'fill-slate-200 text-slate-200'
+                    }`}
+                  />
+                </button>
+              ))}
+            </div>
+            <span className="min-w-14 text-sm font-bold text-slate-500">
+              {rating > 0 ? `${rating} / 5` : 'Seç'}
+            </span>
+          </div>
+        </div>
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            onClick={() => ratingMutation.mutate()}
+            disabled={rating === 0 || ratingMutation.isPending}
+            className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white transition-all hover:bg-indigo-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {ratingMutation.isPending ? 'Gönderiliyor...' : 'Puanı Gönder'}
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 p-4">
+        <label className="block text-sm font-extrabold text-slate-900" htmlFor="product-review-comment">
+          Yorum Yaz
+        </label>
+        <p className="mt-0.5 text-xs font-medium text-slate-500">
+          Sadece yorum gönderilir ve onaydan sonra yayınlanır.
+        </p>
+        <textarea
+          id="product-review-comment"
+          value={comment}
+          onChange={(event) => setComment(event.target.value)}
+          placeholder="Ürün hakkındaki düşüncelerinizi paylaşabilirsiniz..."
+          className="mt-3 h-28 w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+          maxLength={500}
+        />
+        <div className="mt-4 flex items-center justify-between gap-4">
+          <span className="text-xs font-medium text-slate-400">{comment.length}/500</span>
+          <button
+            type="button"
+            onClick={() => commentMutation.mutate()}
+            disabled={!comment.trim() || commentMutation.isPending}
+            className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white transition-all hover:bg-indigo-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {commentMutation.isPending ? 'Gönderiliyor...' : 'Yorumu Gönder'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReviewAccessNotice({
+  isAuthenticated,
+  isLoading,
+}: {
+  isAuthenticated: boolean;
+  isLoading: boolean;
+}) {
+  if (isLoading) {
+    return (
+      <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+        <h2 className="text-xl font-extrabold text-slate-900">Ürünü Değerlendir</h2>
+        <p className="mt-2 text-sm font-medium text-slate-500">
+          Siparişleriniz kontrol ediliyor...
+        </p>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+        <h2 className="text-xl font-extrabold text-slate-900">Ürünü Değerlendir</h2>
+        <p className="mt-2 text-sm font-medium text-slate-500">
+          Değerlendirme yapmak ve yorum yazmak için giriş yapmanız gerekiyor.
+        </p>
+        <Link
+          href="/auth/login"
+          className="mt-4 inline-flex rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white transition-all hover:bg-indigo-700 active:scale-95"
+        >
+          Giriş Yap
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+      <h2 className="text-xl font-extrabold text-slate-900">Ürünü Değerlendir</h2>
+      <p className="mt-2 text-sm font-medium text-slate-500">
+        Bu ürünü değerlendirmek için ürünün teslim edildiği bir siparişiniz olmalı.
+      </p>
+    </div>
+  );
+}
+
+function ReviewStars({ rating }: { rating: number }) {
+  return (
+    <div className="flex items-center gap-0.5">
+      {Array.from({ length: 5 }).map((_, index) => {
+        const filled = index < rating;
+        return (
+          <Star
+            key={index}
+            className={`h-4 w-4 ${
+              filled ? 'fill-amber-400 text-amber-400' : 'fill-slate-200 text-slate-200'
+            }`}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function formatReviewDate(date: string) {
+  try {
+    return new Date(date).toLocaleDateString('tr-TR', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+  } catch {
+    return date;
+  }
+}
+
+function ApprovedReviewsList({
+  reviews,
+  isLoading,
+}: {
+  reviews: ProductReview[];
+  isLoading: boolean;
+}) {
+  const visibleReviews = reviews.filter((review) => review.comment?.trim());
+
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-extrabold text-slate-900">Yorumlar</h2>
+          <p className="mt-1 text-sm font-medium text-slate-500">
+            Sadece onaylanmış yorumlar burada yayınlanır.
+          </p>
+        </div>
+        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
+          {visibleReviews.length} Yorum
+        </span>
+      </div>
+
+      <div className="mt-5 flex flex-col gap-4">
+        {isLoading ? (
+          <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 text-sm font-semibold text-slate-500">
+            Yorumlar yükleniyor...
+          </div>
+        ) : visibleReviews.length === 0 ? (
+          <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 text-sm font-semibold text-slate-500">
+            Henüz onaylanmış yorum yok.
+          </div>
+        ) : (
+          visibleReviews.map((review) => (
+            <article
+              key={review.id}
+              className="rounded-xl border border-slate-100 bg-slate-50 p-4"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <ReviewStars rating={review.rating} />
+                  <span className="text-sm font-extrabold text-slate-800">
+                    {review.rating} / 5
+                  </span>
+                </div>
+                <span className="text-xs font-bold text-slate-400">
+                  {formatReviewDate(review.created_at)}
+                </span>
+              </div>
+              <p className="mt-3 text-sm font-medium leading-relaxed text-slate-700">
+                {review.comment}
+              </p>
+            </article>
+          ))
+        )}
+      </div>
     </div>
   );
 }
@@ -59,11 +364,24 @@ function RatingStars({ rating, reviewCount }: { rating: number; reviewCount: num
 
 export default function ProductDetailPage(props: { params: Promise<{ id: string }> }) {
   const params = use(props.params);
+  const queryClient = useQueryClient();
+  const { isAuthenticated } = useAuthStore();
 
   const { data: product, isLoading, isError } = useQuery({
     queryKey: ['product', params.id],
     queryFn: () => fetchProductDetail(params.id),
     enabled: !!params.id,
+  });
+  const { data: approvedReviews = [], isLoading: isReviewsLoading } = useQuery({
+    queryKey: ['product-reviews', params.id],
+    queryFn: () => fetchProductReviews(params.id),
+    enabled: !!params.id,
+  });
+  const { data: orders = [], isLoading: isOrdersLoading } = useQuery<Order[]>({
+    queryKey: ['orders'],
+    queryFn: fetchOrders,
+    enabled: isAuthenticated,
+    retry: 1,
   });
 
   const isOutOfStock = product?.stockStatus === 'out_of_stock' || product?.stockCount === 0;
@@ -202,6 +520,11 @@ export default function ProductDetailPage(props: { params: Promise<{ id: string 
     displayOriginal && displayOriginal > displayPrice
       ? Math.round(((displayOriginal - displayPrice) / displayOriginal) * 100)
       : 0;
+  const canReviewProduct = orders.some(
+    (order) =>
+      order.status === 'delivered' &&
+      order.items.some((item) => String(item.product_id) === product.id),
+  );
 
   /* ════════════════════════ RENDER ════════════════════════════════ */
 
@@ -255,7 +578,11 @@ export default function ProductDetailPage(props: { params: Promise<{ id: string 
           </div>
 
           {/* Rating */}
-          <RatingStars rating={product.rating} reviewCount={product.reviewCount} />
+          <RatingStars
+            rating={product.rating}
+            reviewCount={product.reviewCount}
+            commentCount={product.commentCount ?? 0}
+          />
 
           {/* Tags */}
           {product.tags && product.tags.length > 0 && (
@@ -407,6 +734,32 @@ export default function ProductDetailPage(props: { params: Promise<{ id: string 
           <ProductAccordion items={accordionItems} />
         </div>
       )}
+
+      <div className="mt-8">
+        {canReviewProduct ? (
+          <ReviewForm
+            productId={product.id}
+            isAuthenticated={isAuthenticated}
+            onSubmitted={() => {
+              queryClient.invalidateQueries({ queryKey: ['product', params.id] });
+              queryClient.invalidateQueries({ queryKey: ['products'] });
+              queryClient.invalidateQueries({ queryKey: ['product-reviews', params.id] });
+            }}
+          />
+        ) : (
+          <ReviewAccessNotice
+            isAuthenticated={isAuthenticated}
+            isLoading={isOrdersLoading}
+          />
+        )}
+      </div>
+
+      <div className="mt-8">
+        <ApprovedReviewsList
+          reviews={approvedReviews}
+          isLoading={isReviewsLoading}
+        />
+      </div>
     </div>
   );
 }

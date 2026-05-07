@@ -8,6 +8,21 @@ export interface PaginatedProductResponse {
   page_size: number;
 }
 
+export interface ProductReviewPayload {
+  rating?: number;
+  comment?: string;
+}
+
+export interface ProductReview {
+  id: number;
+  product_id: number;
+  user_id: number;
+  rating: number;
+  comment: string | null;
+  approval_status: string;
+  created_at: string;
+}
+
 // Raw response shape as returned by the FastAPI backend (snake_case)
 interface BackendProductRaw {
   id: number;
@@ -24,6 +39,7 @@ interface BackendProductRaw {
   is_new: boolean | null;
   rating: string | null;
   review_count: number | null;
+  comment_count: number | null;
   brand: string | null;
   sub_type: string | null;
   goal_tags: string | null;
@@ -49,6 +65,7 @@ const mapBackendToProduct = (item: BackendProductRaw): Product => ({
   images: item.images || [],
   rating: Number(item.rating) || 0,
   reviewCount: item.review_count || 0,
+  commentCount: item.comment_count || 0,
   stockStatus: (item.stock_status as StockStatus) || 'in_stock',
   stockCount: item.stock,
   isNew: item.is_new ?? undefined,
@@ -91,4 +108,17 @@ export const fetchProducts = async (pageSize = 60): Promise<PaginatedProductResp
 export const fetchProductDetail = async (id: string | number): Promise<Product> => {
   const data = await apiClient.get<BackendProductRaw>(`/v1/products/${id}`) as unknown as BackendProductRaw;
   return mapBackendToProduct(data);
+};
+
+export const submitProductReview = async (
+  productId: string | number,
+  payload: ProductReviewPayload,
+) => {
+  return apiClient.post(`/v1/products/${productId}/reviews`, payload);
+};
+
+export const fetchProductReviews = async (
+  productId: string | number,
+): Promise<ProductReview[]> => {
+  return apiClient.get(`/v1/products/${productId}/reviews`) as unknown as ProductReview[];
 };
