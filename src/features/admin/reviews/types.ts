@@ -4,7 +4,7 @@ export interface AdminReview {
   id: number;
   product_id: number;
   user_id: number;
-  rating: number;
+  rating: number | null;
   comment: string | null;
   approval_status: ReviewApprovalStatus;
   created_at: string;

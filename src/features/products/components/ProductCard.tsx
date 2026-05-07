@@ -20,6 +20,7 @@ function RatingStars({
   commentCount: number;
 }) {
   const hasRating = rating > 0 && reviewCount > 0;
+  const hasComments = commentCount > 0;
 
   return (
     <div className="flex items-center gap-1.5">
@@ -46,7 +47,7 @@ function RatingStars({
         })}
       </div>
       <span className="text-xs font-medium text-slate-400">
-        {hasRating
+        {hasRating || hasComments
           ? `· ${reviewCount} Değerlendirme ${commentCount} Yorum`
           : 'Henüz değerlendirme yok'}
       </span>

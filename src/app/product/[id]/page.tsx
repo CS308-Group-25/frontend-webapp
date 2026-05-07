@@ -44,6 +44,7 @@ function RatingStars({
   commentCount: number;
 }) {
   const hasRating = rating > 0 && reviewCount > 0;
+  const hasComments = commentCount > 0;
 
   return (
     <div className="flex items-center gap-2">
@@ -70,7 +71,7 @@ function RatingStars({
         })}
       </div>
       <span className="text-sm font-bold text-slate-700">
-        {hasRating
+        {hasRating || hasComments
           ? `· ${reviewCount.toLocaleString('tr-TR')} Değerlendirme ${commentCount.toLocaleString('tr-TR')} Yorum`
           : 'Henüz değerlendirme yok'}
       </span>
@@ -333,27 +334,44 @@ function ApprovedReviewsList({
             Henüz onaylanmış yorum yok.
           </div>
         ) : (
-          visibleReviews.map((review) => (
-            <article
-              key={review.id}
-              className="rounded-xl border border-slate-100 bg-slate-50 p-4"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <ReviewStars rating={review.rating} />
-                  <span className="text-sm font-extrabold text-slate-800">
-                    {review.rating} / 5
+          visibleReviews.map((review) => {
+            const reviewRating = review.rating;
+            const hasRating = typeof reviewRating === 'number';
+            const reviewerName = review.customer_name?.trim() || `Kullanıcı #${review.user_id}`;
+
+            return (
+              <article
+                key={review.id}
+                className="rounded-xl border border-slate-100 bg-slate-50 p-4"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  {hasRating ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-extrabold text-slate-800">
+                        {reviewerName}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <ReviewStars rating={reviewRating} />
+                        <span className="text-sm font-extrabold text-slate-800">
+                          {reviewRating} / 5
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="text-sm font-extrabold text-slate-800">
+                      {reviewerName}
+                    </span>
+                  )}
+                  <span className="text-xs font-bold text-slate-400">
+                    {formatReviewDate(review.created_at)}
                   </span>
                 </div>
-                <span className="text-xs font-bold text-slate-400">
-                  {formatReviewDate(review.created_at)}
-                </span>
-              </div>
-              <p className="mt-3 text-sm font-medium leading-relaxed text-slate-700">
-                {review.comment}
-              </p>
-            </article>
-          ))
+                <p className="mt-3 text-sm font-medium leading-relaxed text-slate-700">
+                  {review.comment}
+                </p>
+              </article>
+            );
+          })
         )}
       </div>
     </div>

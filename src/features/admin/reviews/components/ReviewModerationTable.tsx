@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   XCircle,
   Trash2,
-  Star,
   MessageSquare,
   Loader2,
   ChevronDown,
@@ -32,20 +31,6 @@ function StatusBadge({ status }: { status: ReviewApprovalStatus }) {
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${config.className}`}>
       {config.label}
     </span>
-  );
-}
-
-function StarRating({ rating }: { rating: number }) {
-  return (
-    <div className="flex items-center gap-0.5">
-      {[1, 2, 3, 4, 5].map((star) => (
-        <Star
-          key={star}
-          className={`w-3.5 h-3.5 ${star <= rating ? 'fill-amber-400 text-amber-400' : 'text-slate-200 fill-slate-200'}`}
-        />
-      ))}
-      <span className="ml-1 text-xs font-semibold text-slate-600">{rating}/5</span>
-    </div>
   );
 }
 
@@ -140,7 +125,6 @@ export default function ReviewModerationTable({
               <th className="px-6 py-4 font-bold">Yorum No</th>
               <th className="px-6 py-4 font-bold">Ürün</th>
               <th className="px-6 py-4 font-bold">Müşteri</th>
-              <th className="px-6 py-4 font-bold">Puan</th>
               <th className="px-6 py-4 font-bold">Yorum</th>
               <th className="px-6 py-4 font-bold">Tarih</th>
               <th className="px-6 py-4 font-bold">Durum</th>
@@ -181,11 +165,6 @@ export default function ReviewModerationTable({
                         </span>
                         <span className="text-xs text-slate-400">{review.customer_email}</span>
                       </div>
-                    </td>
-
-                    {/* Rating */}
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <StarRating rating={review.rating} />
                     </td>
 
                     {/* Comment (Summary) */}
@@ -264,7 +243,7 @@ export default function ReviewModerationTable({
                   {/* Expanded Content */}
                   {isExpanded && review.comment && (
                     <tr>
-                      <td colSpan={8} className="px-6 py-0 border-none bg-indigo-50/20">
+                      <td colSpan={7} className="px-6 py-0 border-none bg-indigo-50/20">
                         <div className="py-4 px-8 border-l-4 border-indigo-500 my-2 bg-white rounded-r-xl shadow-sm animate-in fade-in slide-in-from-top-1 duration-200">
                           <h4 className="text-[10px] uppercase tracking-wider font-black text-indigo-400 mb-2">
                             Müşteri Yorumu
