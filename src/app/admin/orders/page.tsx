@@ -10,6 +10,7 @@ import { AdminOrder, OrderStatus } from '@/features/admin/orders/types';
 
 const STATUS_OPTIONS: { value: OrderStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'Tüm Siparişler' },
+  { value: 'confirmed', label: 'Onaylandı' },
   { value: 'processing', label: 'Hazırlanıyor' },
   { value: 'in_transit', label: 'Kargoya Verildi' },
   { value: 'delivered', label: 'Teslim Edildi' },
@@ -19,6 +20,7 @@ export default function AdminDeliveryQueuePage() {
   const [selectedStatus, setSelectedStatus] = useState<OrderStatus | undefined>(undefined);
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [updateError, setUpdateError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchAdminOrders()
@@ -40,18 +42,19 @@ export default function AdminDeliveryQueuePage() {
   };
 
   const handleUpdateStatus = async (orderId: number, status: OrderStatus) => {
-    // Update local state immediately
+    const previous = orders;
     setOrders((prev) =>
       prev.map((order) =>
         order.order_id === orderId ? { ...order, status } : order
       )
     );
-    
-    // Try API call
+
     try {
       await updateOrderStatus(orderId, status);
     } catch (error) {
-      console.warn('API update failed:', error);
+      setOrders(previous);
+      setUpdateError('Durum güncellenemedi, lütfen tekrar deneyin.');
+      setTimeout(() => setUpdateError(null), 3000);
     }
   };
 
@@ -90,6 +93,12 @@ export default function AdminDeliveryQueuePage() {
           </div>
         </div>
       </div>
+
+      {updateError && (
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          {updateError}
+        </div>
+      )}
 
       <div className="mb-6 flex flex-wrap gap-2">
         {STATUS_OPTIONS.map((option) => {
