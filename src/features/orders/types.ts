@@ -2,6 +2,7 @@ export type OrderStatus =
   | 'created'
   | 'processing'
   | 'shipped'
+  | 'in_transit'
   | 'delivered'
   | 'cancelled'
   | 'returned'

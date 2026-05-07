@@ -1,4 +1,4 @@
-export type OrderStatus = 'confirmed' | 'processing' | 'in_transit' | 'delivered';
+export type OrderStatus = 'confirmed' | 'processing' | 'in_transit' | 'delivered' | 'cancelled';
 
 export interface OrderItem {
   product_id: number;
