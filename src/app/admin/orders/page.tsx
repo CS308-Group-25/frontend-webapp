@@ -37,7 +37,10 @@ export default function AdminDeliveryQueuePage() {
 
   useEffect(() => {
     if (!isAuthorized) return;
-    loadOrders();
+    fetchAdminOrders()
+      .then(setOrders)
+      .catch(() => setFetchError(true))
+      .finally(() => setLoading(false));
   }, [isAuthorized]);
 
   const filteredOrders = useMemo(
@@ -59,7 +62,7 @@ export default function AdminDeliveryQueuePage() {
 
     try {
       await updateOrderStatus(orderId, status);
-    } catch (error) {
+    } catch {
       setOrders(previous);
       setUpdateError('Durum güncellenemedi, lütfen tekrar deneyin.');
       setTimeout(() => setUpdateError(null), 3000);
