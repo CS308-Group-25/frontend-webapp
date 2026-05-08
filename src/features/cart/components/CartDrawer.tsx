@@ -4,10 +4,12 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { X, Trash2, Plus, Minus, ShoppingBag } from 'lucide-react';
+import { X, Trash2, ShoppingBag } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCartStore } from '../store/cart.store';
 import { useAuthStore } from '@/features/auth';
-import { mockProducts } from '@/features/products';
+import { fetchProducts, type PaginatedProductResponse } from '@/features/products';
+import QuantitySelector from '@/features/products/components/QuantitySelector';
 
 export const CartDrawer = () => {
   const {
@@ -20,6 +22,18 @@ export const CartDrawer = () => {
   const { isAuthenticated } = useAuthStore();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
+
+  // Read the already-fetched product catalogue from the React Query cache.
+  // This avoids an extra API call since the search page already populated the cache.
+  const queryClient = useQueryClient();
+  const cachedData = queryClient.getQueryData<PaginatedProductResponse>(['products', 'all']);
+  const { data: productData } = useQuery({
+    queryKey: ['products', 'all'],
+    queryFn: () => fetchProducts(200),
+    enabled: isDrawerOpen && items.length > 0,
+    initialData: cachedData,
+  });
+  const cachedProducts = productData?.items ?? [];
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -40,16 +54,20 @@ export const CartDrawer = () => {
 
   if (!isDrawerOpen || !mounted) return null;
 
-  // Calculate cart details using mock products
+  // Enrich cart items with product details.
+  // Prefer values persisted in localStorage (item.name/price/image),
+  // fall back to the React Query product cache if not available.
   const cartDetails = items.map((cartItem) => {
-    const product = mockProducts.find((p) => p.id === cartItem.productId);
+    const product = cachedProducts.find((p) => p.id === cartItem.productId);
     return {
       ...cartItem,
-      productName: product?.name || 'Bilinmeyen Ürün',
-      productPrice: product?.price || 0,
-      productImage: product?.image || '/placeholder.png', // Fallback image if any
+      productName: cartItem.name || product?.name || 'Ürün',
+      productPrice: cartItem.price ?? product?.price ?? 0,
+      productImage: cartItem.image || product?.image || '/placeholder.png',
+      stockCount: cartItem.stockCount ?? product?.stockCount,
     };
   });
+
 
   const totalAmount = cartDetails.reduce(
     (total, item) => total + item.productPrice * item.quantity,
@@ -108,8 +126,8 @@ export const CartDrawer = () => {
             </div>
           ) : (
             <div className="flex flex-col gap-6">
-              {cartDetails.map((item) => (
-                <div key={item.productId} className="flex gap-4 border-b border-slate-100 pb-4 last:border-0 last:pb-0">
+              {cartDetails.map((item, index) => (
+                <div key={`cart-item-${item.cartItemId ?? 'local'}-${item.productId}-${index}`} className="flex gap-4 border-b border-slate-100 pb-4 last:border-0 last:pb-0">
                   {/* Product Image */}
                   <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-slate-50 border border-slate-100">
                     <Image
@@ -124,11 +142,18 @@ export const CartDrawer = () => {
                   {/* Product Details */}
                   <div className="flex flex-1 flex-col py-1">
                     <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-bold text-slate-800 line-clamp-2 leading-tight">
-                        {item.productName}
-                      </h3>
+                      <div className="flex flex-col">
+                        <h3 className="font-bold text-slate-800 line-clamp-2 leading-tight">
+                          {item.productName}
+                        </h3>
+                        {(item.flavor || item.size) && (
+                          <div className="mt-1 text-sm font-bold text-slate-400">
+                            {[item.flavor, item.size].filter(Boolean).join(' / ')}
+                          </div>
+                        )}
+                      </div>
                       <button
-                        onClick={() => removeItem(item.productId)}
+                        onClick={() => removeItem(item.productId, item.cartItemId)}
                         className="text-slate-400 transition-colors hover:text-red-500"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -137,27 +162,15 @@ export const CartDrawer = () => {
                     
                     <div className="mt-auto flex items-center justify-between">
                       {/* Quantity Selector */}
-                      <div className="flex items-center rounded-lg border border-slate-200 bg-white">
-                        <button
-                          onClick={() => updateItem(item.productId, item.quantity - 1)}
-                          className="p-1.5 text-slate-500 transition-colors hover:bg-slate-50 hover:text-indigo-600 focus:outline-none"
-                        >
-                          <Minus className="h-3.5 w-3.5" />
-                        </button>
-                        <span className="w-8 text-center text-sm font-semibold text-slate-700">
-                          {item.quantity}
-                        </span>
-                        <button
-                          onClick={() => updateItem(item.productId, item.quantity + 1)}
-                          className="p-1.5 text-slate-500 transition-colors hover:bg-slate-50 hover:text-indigo-600 focus:outline-none"
-                        >
-                          <Plus className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
+                      <QuantitySelector
+                        quantity={item.quantity}
+                        max={item.stockCount ?? 99}
+                        onChange={(quantity) => updateItem(item.productId, quantity, item.cartItemId, item.stockCount)}
+                      />
 
                       <div className="text-right">
                         <p className="font-black text-slate-900">
-                          {item.productPrice * item.quantity} TL
+                          {(item.productPrice * item.quantity).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                         </p>
                       </div>
                     </div>
@@ -173,7 +186,7 @@ export const CartDrawer = () => {
           <div className="border-t border-slate-100 bg-white p-6 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)]">
             <div className="mb-4 flex items-center justify-between text-lg font-black text-slate-900">
               <span>Toplam</span>
-              <span>{totalAmount} TL</span>
+              <span>{totalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
             </div>
             <button
               onClick={handleCheckout}

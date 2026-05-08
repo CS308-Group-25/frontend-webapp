@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { fetchWishlistItems, addWishlistItem, removeWishlistItem } from '../api/wishlist.api';
+import { fetchWishlistItems, addWishlistItem, removeWishlistItem, clearWishlistItems } from '../api/wishlist.api';
 import { useAuthStore } from '@/features/auth';
 import { toast } from 'sonner';
 
@@ -118,8 +118,24 @@ export const useWishlistStore = create<WishlistState>()(
         }
       },
 
-      // ─── Clear (local only) ───────────────────────────────────────────────
-      clearWishlist: () => set({ items: [], mergeAttempted: false }),
+      // ─── Clear ──────────────────────────────────────────────────────────────
+      clearWishlist: async () => {
+        const isAuth = useAuthStore.getState().isAuthenticated;
+        const previousItems = [...get().items];
+
+        // Optimistic update
+        set({ items: [], mergeAttempted: false });
+
+        if (isAuth) {
+          try {
+            await clearWishlistItems();
+          } catch (error) {
+            console.error('[WishlistStore] Failed to clear wishlist:', error);
+            toast.error('Favori listesi temizlenemedi.');
+            set({ items: previousItems }); // rollback
+          }
+        }
+      },
 
       // ─── Fetch server state ───────────────────────────────────────────────
       fetchServerWishlist: async () => {

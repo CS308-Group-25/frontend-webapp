@@ -1,17 +1,34 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { Star } from 'lucide-react';
+import { ShoppingCart, Star } from 'lucide-react';
 import { Product } from '../types/product.types';
 import StockBadge from './StockBadge';
 import WishlistButton from '@/features/wishlist/components/WishlistButton';
+import { useCartStore } from '@/features/cart';
 
 interface ProductCardProps {
   product: Product;
 }
 
-function RatingStars({ rating, reviewCount }: { rating: number; reviewCount: number }) {
+function RatingStars({
+  rating,
+  reviewCount,
+  commentCount,
+}: {
+  rating: number;
+  reviewCount: number;
+  commentCount: number;
+}) {
+  const hasRating = rating > 0 && reviewCount > 0;
+  const hasComments = commentCount > 0;
+
   return (
     <div className="flex items-center gap-1.5">
+      {hasRating && (
+        <span className="text-xs font-extrabold text-slate-700">
+          {rating.toFixed(1)}
+        </span>
+      )}
       <div className="flex items-center gap-0.5">
         {Array.from({ length: 5 }).map((_, i) => {
           const filled = i < Math.floor(rating);
@@ -30,7 +47,9 @@ function RatingStars({ rating, reviewCount }: { rating: number; reviewCount: num
         })}
       </div>
       <span className="text-xs font-medium text-slate-400">
-        {reviewCount > 0 ? `${reviewCount} Yorum` : 'Henüz yorum yok'}
+        {hasRating || hasComments
+          ? `· ${reviewCount} Değerlendirme ${commentCount} Yorum`
+          : 'Henüz değerlendirme yok'}
       </span>
     </div>
   );
@@ -39,7 +58,7 @@ function RatingStars({ rating, reviewCount }: { rating: number; reviewCount: num
 function DiscountBadge({ price, originalPrice }: { price: number; originalPrice: number }) {
   const discount = Math.round(((originalPrice - price) / originalPrice) * 100);
   return (
-    <div className="absolute -right-2 -top-2 z-10 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-red-600 shadow-lg shadow-red-500/30">
+    <div className="absolute -left-2 -top-2 z-10 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-red-600 shadow-lg shadow-red-500/30">
       <div className="text-center leading-tight">
         <span className="block text-xs font-extrabold text-white">%{discount}</span>
         <span className="block text-[9px] font-bold uppercase text-red-100">İndirim</span>
@@ -48,7 +67,15 @@ function DiscountBadge({ price, originalPrice }: { price: number; originalPrice:
   );
 }
 
-function NewBadge() {
+function NewBadge({ compact = false }: { compact?: boolean }) {
+  if (compact) {
+    return (
+      <div className="absolute right-3 top-16 z-10 rounded-l-full rounded-tr-full bg-gradient-to-r from-indigo-600 to-indigo-500 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-white shadow-lg shadow-indigo-500/30">
+        Yeni
+      </div>
+    );
+  }
+
   return (
     <div className="absolute -left-2 top-3 z-10">
       <div className="rounded-r-full rounded-tl-full bg-gradient-to-r from-indigo-600 to-indigo-500 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-white shadow-lg shadow-indigo-500/30">
@@ -59,7 +86,35 @@ function NewBadge() {
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
-  const isOutOfStock = product.stockStatus === 'out_of_stock';
+  const { addItem, openDrawer } = useCartStore();
+  const isOutOfStock = product.stockStatus === 'out_of_stock' || product.stockCount === 0;
+  const flavors = Array.isArray(product.flavors) ? product.flavors : undefined;
+  const sizes = Array.isArray(product.sizes) ? product.sizes : undefined;
+  const hasVariantData = Boolean(flavors && sizes);
+  const singleFlavor = flavors?.length === 1 ? flavors[0] : undefined;
+  const singleSize = sizes?.length === 1 ? sizes[0] : undefined;
+  const hasAmbiguousFlavor = Boolean(flavors && flavors.length > 1);
+  const hasAmbiguousSize = Boolean(sizes && sizes.length > 1);
+  const canQuickAdd = !isOutOfStock && hasVariantData && !hasAmbiguousFlavor && !hasAmbiguousSize;
+  const displayPrice = singleSize?.price ?? product.price;
+  const displayOriginalPrice = singleSize?.originalPrice ?? product.originalPrice;
+
+  const handleQuickAdd = async (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const variantId = [singleFlavor?.id, singleSize?.id].filter(Boolean).join('-') || undefined;
+
+    await addItem(product.id, 1, variantId, {
+      name: product.name,
+      price: displayPrice,
+      image: product.image || product.images?.[0] || '/placeholder.png',
+      flavor: singleFlavor?.name,
+      size: singleSize?.label,
+      stockCount: product.stockCount,
+    });
+    openDrawer();
+  };
 
   return (
     <Link
@@ -69,9 +124,9 @@ export default function ProductCard({ product }: ProductCardProps) {
         }`}
     >
       {/* Badges */}
-      {product.isNew && <NewBadge />}
-      {product.originalPrice && (
-        <DiscountBadge price={product.price} originalPrice={product.originalPrice} />
+      {product.isNew && <NewBadge compact />}
+      {displayOriginalPrice && (
+        <DiscountBadge price={displayPrice} originalPrice={displayOriginalPrice} />
       )}
 
       {/* Image Container */}
@@ -86,16 +141,32 @@ export default function ProductCard({ product }: ProductCardProps) {
         />
 
         {/* Wishlist Button */}
-        <div className="absolute bottom-3 right-3 z-10 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+        <div className="absolute right-3 top-3 z-20 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
           <WishlistButton productId={product.id} size="sm" />
         </div>
 
         {/* Hover Overlay */}
         {!isOutOfStock && (
           <div className="absolute inset-0 flex items-end justify-center bg-gradient-to-t from-indigo-900/60 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-            <button className="mb-4 rounded-xl bg-white px-6 py-2.5 text-sm font-bold text-indigo-600 shadow-lg transition-all hover:bg-indigo-50 active:scale-95">
-              İncele
-            </button>
+            {canQuickAdd ? (
+              <div className="mb-4 grid w-full max-w-[calc(100%-2rem)] grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={handleQuickAdd}
+                  className="inline-flex min-w-0 items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2.5 text-xs font-extrabold text-white shadow-lg transition-all hover:bg-indigo-700 active:scale-95"
+                >
+                  <ShoppingCart className="h-4 w-4" />
+                  <span className="truncate">Sepete Ekle</span>
+                </button>
+                <span className="flex min-w-0 items-center justify-center rounded-xl bg-white px-3 py-2.5 text-xs font-extrabold text-indigo-600 shadow-lg transition-all group-hover:bg-indigo-50">
+                  İncele
+                </span>
+              </div>
+            ) : (
+              <span className="mb-4 rounded-xl bg-white px-6 py-2.5 text-sm font-bold text-indigo-600 shadow-lg transition-all group-hover:bg-indigo-50">
+                İncele
+              </span>
+            )}
           </div>
         )}
       </div>
@@ -113,17 +184,21 @@ export default function ProductCard({ product }: ProductCardProps) {
         </div>
 
         {/* Rating */}
-        <RatingStars rating={product.rating} reviewCount={product.reviewCount} />
+        <RatingStars
+          rating={product.rating}
+          reviewCount={product.reviewCount}
+          commentCount={product.commentCount ?? 0}
+        />
 
         {/* Price & Stock */}
         <div className="mt-auto flex items-end justify-between pt-2">
           <div className="flex items-baseline gap-2">
             <span className={`text-lg font-extrabold ${isOutOfStock ? 'text-slate-400' : 'text-indigo-600'}`}>
-              {product.price} TL
+              {displayPrice} TL
             </span>
-            {product.originalPrice && (
+            {displayOriginalPrice && (
               <span className="text-sm font-semibold text-red-400 line-through">
-                {product.originalPrice} TL
+                {displayOriginalPrice} TL
               </span>
             )}
           </div>

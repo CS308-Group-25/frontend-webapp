@@ -2,9 +2,10 @@
 
 import React from 'react';
 import { Truck, CheckCircle2 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { AddressFormData } from '../types';
 import { useCartStore } from '@/features/cart';
-import { mockProducts } from '@/features/products';
+import { fetchProducts } from '@/features/products';
 
 const FREE_SHIPPING_THRESHOLD = 250;
 
@@ -17,10 +18,18 @@ interface ShippingStepProps {
 export default function ShippingStep({ addressData, onBack, onComplete }: ShippingStepProps) {
   const { items } = useCartStore();
 
+  // Always use useQuery so subtotal is correct even on cold cache (direct /checkout visit)
+  const { data } = useQuery({
+    queryKey: ['products', 'all'],
+    queryFn: () => fetchProducts(200),
+  });
+  const allProducts = data?.items ?? [];
+
   const subtotal = items.reduce((sum, item) => {
-    const product = mockProducts.find((p) => p.id === item.productId);
+    const product = allProducts.find((p) => p.id === item.productId);
     return sum + (product?.price ?? 0) * item.quantity;
   }, 0);
+
 
   const isFreeShipping = subtotal >= FREE_SHIPPING_THRESHOLD;
 

@@ -1,11 +1,12 @@
 'use client';
 
-import { use, useState, useMemo } from 'react';
+import { use, useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { ChevronRight, Star, Truck, ShieldCheck, Clock, Leaf, WheatOff, Package } from 'lucide-react';
 import {
-  mockProducts,
+  fetchProductReviews,
+  fetchProductDetail,
+  submitProductReview,
   ProductImageGallery,
   FlavorSelector,
   SizeSelector,
@@ -14,7 +15,13 @@ import {
   ProductAccordion,
   StockBadge
 } from '@/features/products';
+import type { ProductReview } from '@/features/products/api/products.api';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import WishlistButton from '@/features/wishlist/components/WishlistButton';
+import { toast } from 'sonner';
+import { useAuthStore } from '@/features/auth';
+import { fetchOrders } from '@/features/orders/api';
+import type { Order } from '@/features/orders/types';
 
 
 /* ──────────────────────── Tag Badge Mapping ──────────────────────── */
@@ -27,9 +34,25 @@ const tagIcons: Record<string, React.ReactNode> = {
 
 /* ──────────────────────── Rating Stars (shared) ──────────────────── */
 
-function RatingStars({ rating, reviewCount }: { rating: number; reviewCount: number }) {
+function RatingStars({
+  rating,
+  reviewCount,
+  commentCount,
+}: {
+  rating: number;
+  reviewCount: number;
+  commentCount: number;
+}) {
+  const hasRating = rating > 0 && reviewCount > 0;
+  const hasComments = commentCount > 0;
+
   return (
     <div className="flex items-center gap-2">
+      {hasRating && (
+        <span className="text-sm font-extrabold text-slate-900">
+          {rating.toFixed(1)}
+        </span>
+      )}
       <div className="flex items-center gap-0.5">
         {Array.from({ length: 5 }).map((_, i) => {
           const filled = i < Math.floor(rating);
@@ -37,20 +60,320 @@ function RatingStars({ rating, reviewCount }: { rating: number; reviewCount: num
           return (
             <Star
               key={i}
-              className={`h-5 w-5 ${
-                filled
-                  ? 'fill-amber-400 text-amber-400'
-                  : half
-                    ? 'fill-amber-400/50 text-amber-400'
-                    : 'fill-slate-200 text-slate-200'
-              }`}
+              className={`h-5 w-5 ${filled
+                ? 'fill-amber-400 text-amber-400'
+                : half
+                  ? 'fill-amber-400/50 text-amber-400'
+                  : 'fill-slate-200 text-slate-200'
+                }`}
             />
           );
         })}
       </div>
       <span className="text-sm font-bold text-slate-700">
-        {reviewCount > 0 ? `${reviewCount.toLocaleString('tr-TR')} Yorum` : 'Henüz yorum yok'}
+        {hasRating || hasComments
+          ? `· ${reviewCount.toLocaleString('tr-TR')} Değerlendirme ${commentCount.toLocaleString('tr-TR')} Yorum`
+          : 'Henüz değerlendirme yok'}
       </span>
+    </div>
+  );
+}
+
+function ReviewForm({
+  productId,
+  isAuthenticated,
+  onSubmitted,
+}: {
+  productId: string;
+  isAuthenticated: boolean;
+  onSubmitted: () => void;
+}) {
+  const [rating, setRating] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);
+  const [comment, setComment] = useState('');
+
+  const ratingMutation = useMutation({
+    mutationFn: () => submitProductReview(productId, { rating }),
+    onSuccess: () => {
+      toast.success('Değerlendirmeniz alındı.');
+      setRating(0);
+      setHoverRating(0);
+      onSubmitted();
+    },
+    onError: (error) => {
+      toast.error(typeof error === 'string' ? error : 'Değerlendirme gönderilemedi.');
+    },
+  });
+
+  const commentMutation = useMutation({
+    mutationFn: () => submitProductReview(productId, {
+      comment: comment.trim(),
+    }),
+    onSuccess: () => {
+      toast.success('Yorumunuz alındı. Onaydan sonra yayınlanacaktır.');
+      setComment('');
+      onSubmitted();
+    },
+    onError: (error) => {
+      toast.error(typeof error === 'string' ? error : 'Yorum gönderilemedi.');
+    },
+  });
+
+  const activeRating = hoverRating || rating;
+
+  if (!isAuthenticated) {
+    return (
+      <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+        <h2 className="text-xl font-extrabold text-slate-900">Ürünü Değerlendir</h2>
+        <p className="mt-2 text-sm font-medium text-slate-500">
+          Değerlendirme yapmak ve yorum yazmak için giriş yapmanız gerekiyor.
+        </p>
+        <Link
+          href="/auth/login"
+          className="mt-4 inline-flex rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white transition-all hover:bg-indigo-700 active:scale-95"
+        >
+          Giriş Yap
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-xl font-extrabold text-slate-900">Ürünü Değerlendir</h2>
+        <p className="text-sm font-medium text-slate-500">
+          Yıldız puanınız hemen değerlendirmeye eklenir. Yorumu ayrıca gönderebilirsiniz.
+        </p>
+      </div>
+
+      <div className="mt-5 rounded-xl border border-slate-100 bg-slate-50 p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-sm font-extrabold text-slate-900">Puan Ver</h3>
+            <p className="mt-0.5 text-xs font-medium text-slate-500">
+              Sadece yıldız puanı gönderilir.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1" onMouseLeave={() => setHoverRating(0)}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  type="button"
+                  onMouseEnter={() => setHoverRating(star)}
+                  onFocus={() => setHoverRating(star)}
+                  onBlur={() => setHoverRating(0)}
+                  onClick={() => setRating(star)}
+                  className="rounded-md p-0.5 transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-amber-200"
+                  aria-label={`${star} yıldız ver`}
+                >
+                  <Star
+                    className={`h-8 w-8 ${
+                      star <= activeRating
+                        ? 'fill-amber-400 text-amber-400'
+                        : 'fill-slate-200 text-slate-200'
+                    }`}
+                  />
+                </button>
+              ))}
+            </div>
+            <span className="min-w-14 text-sm font-bold text-slate-500">
+              {rating > 0 ? `${rating} / 5` : 'Seç'}
+            </span>
+          </div>
+        </div>
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            onClick={() => ratingMutation.mutate()}
+            disabled={rating === 0 || ratingMutation.isPending}
+            className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white transition-all hover:bg-indigo-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {ratingMutation.isPending ? 'Gönderiliyor...' : 'Puanı Gönder'}
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 p-4">
+        <label className="block text-sm font-extrabold text-slate-900" htmlFor="product-review-comment">
+          Yorum Yaz
+        </label>
+        <p className="mt-0.5 text-xs font-medium text-slate-500">
+          Sadece yorum gönderilir ve onaydan sonra yayınlanır.
+        </p>
+        <textarea
+          id="product-review-comment"
+          value={comment}
+          onChange={(event) => setComment(event.target.value)}
+          placeholder="Ürün hakkındaki düşüncelerinizi paylaşabilirsiniz..."
+          className="mt-3 h-28 w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+          maxLength={500}
+        />
+        <div className="mt-4 flex items-center justify-between gap-4">
+          <span className="text-xs font-medium text-slate-400">{comment.length}/500</span>
+          <button
+            type="button"
+            onClick={() => commentMutation.mutate()}
+            disabled={!comment.trim() || commentMutation.isPending}
+            className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white transition-all hover:bg-indigo-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {commentMutation.isPending ? 'Gönderiliyor...' : 'Yorumu Gönder'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReviewAccessNotice({
+  isAuthenticated,
+  isLoading,
+}: {
+  isAuthenticated: boolean;
+  isLoading: boolean;
+}) {
+  if (isLoading) {
+    return (
+      <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+        <h2 className="text-xl font-extrabold text-slate-900">Ürünü Değerlendir</h2>
+        <p className="mt-2 text-sm font-medium text-slate-500">
+          Siparişleriniz kontrol ediliyor...
+        </p>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+        <h2 className="text-xl font-extrabold text-slate-900">Ürünü Değerlendir</h2>
+        <p className="mt-2 text-sm font-medium text-slate-500">
+          Değerlendirme yapmak ve yorum yazmak için giriş yapmanız gerekiyor.
+        </p>
+        <Link
+          href="/auth/login"
+          className="mt-4 inline-flex rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white transition-all hover:bg-indigo-700 active:scale-95"
+        >
+          Giriş Yap
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+      <h2 className="text-xl font-extrabold text-slate-900">Ürünü Değerlendir</h2>
+      <p className="mt-2 text-sm font-medium text-slate-500">
+        Bu ürünü değerlendirmek için ürünün teslim edildiği bir siparişiniz olmalı.
+      </p>
+    </div>
+  );
+}
+
+function ReviewStars({ rating }: { rating: number }) {
+  return (
+    <div className="flex items-center gap-0.5">
+      {Array.from({ length: 5 }).map((_, index) => {
+        const filled = index < rating;
+        return (
+          <Star
+            key={index}
+            className={`h-4 w-4 ${
+              filled ? 'fill-amber-400 text-amber-400' : 'fill-slate-200 text-slate-200'
+            }`}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function formatReviewDate(date: string) {
+  try {
+    return new Date(date).toLocaleDateString('tr-TR', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+  } catch {
+    return date;
+  }
+}
+
+function ApprovedReviewsList({
+  reviews,
+  isLoading,
+}: {
+  reviews: ProductReview[];
+  isLoading: boolean;
+}) {
+  const visibleReviews = reviews.filter((review) => review.comment?.trim());
+
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-extrabold text-slate-900">Yorumlar</h2>
+          <p className="mt-1 text-sm font-medium text-slate-500">
+            Sadece onaylanmış yorumlar burada yayınlanır.
+          </p>
+        </div>
+        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
+          {visibleReviews.length} Yorum
+        </span>
+      </div>
+
+      <div className="mt-5 flex flex-col gap-4">
+        {isLoading ? (
+          <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 text-sm font-semibold text-slate-500">
+            Yorumlar yükleniyor...
+          </div>
+        ) : visibleReviews.length === 0 ? (
+          <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 text-sm font-semibold text-slate-500">
+            Henüz onaylanmış yorum yok.
+          </div>
+        ) : (
+          visibleReviews.map((review) => {
+            const reviewRating = review.rating;
+            const hasRating = typeof reviewRating === 'number';
+            const reviewerName = review.customer_name?.trim() || `Kullanıcı #${review.user_id}`;
+
+            return (
+              <article
+                key={review.id}
+                className="rounded-xl border border-slate-100 bg-slate-50 p-4"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  {hasRating ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-extrabold text-slate-800">
+                        {reviewerName}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <ReviewStars rating={reviewRating} />
+                        <span className="text-sm font-extrabold text-slate-800">
+                          {reviewRating} / 5
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="text-sm font-extrabold text-slate-800">
+                      {reviewerName}
+                    </span>
+                  )}
+                  <span className="text-xs font-bold text-slate-400">
+                    {formatReviewDate(review.created_at)}
+                  </span>
+                </div>
+                <p className="mt-3 text-sm font-medium leading-relaxed text-slate-700">
+                  {review.comment}
+                </p>
+              </article>
+            );
+          })
+        )}
+      </div>
     </div>
   );
 }
@@ -59,15 +382,48 @@ function RatingStars({ rating, reviewCount }: { rating: number; reviewCount: num
 
 export default function ProductDetailPage(props: { params: Promise<{ id: string }> }) {
   const params = use(props.params);
-  const router = useRouter();
-  const product = mockProducts.find((p) => p.id === params.id);
-  const isOutOfStock = product?.stockStatus === 'out_of_stock';
+  const queryClient = useQueryClient();
+  const { isAuthenticated } = useAuthStore();
+
+  const { data: product, isLoading, isError } = useQuery({
+    queryKey: ['product', params.id],
+    queryFn: () => fetchProductDetail(params.id),
+    enabled: !!params.id,
+  });
+  const { data: approvedReviews = [], isLoading: isReviewsLoading } = useQuery({
+    queryKey: ['product-reviews', params.id],
+    queryFn: () => fetchProductReviews(params.id),
+    enabled: !!params.id,
+  });
+  const { data: orders = [], isLoading: isOrdersLoading } = useQuery<Order[]>({
+    queryKey: ['orders'],
+    queryFn: fetchOrders,
+    enabled: isAuthenticated,
+    retry: 1,
+  });
+
+  const isOutOfStock = product?.stockStatus === 'out_of_stock' || product?.stockCount === 0;
+  // Accessories use the 'flavors' field to store colors — detect by category
+  const isAccessory = product?.category?.toLowerCase().includes('aksesuar') ?? false;
 
   /* ── State ────────────────────────────────────────────────────── */
 
-  const [selectedFlavor, setSelectedFlavor] = useState(product?.flavors?.[0]?.id ?? '');
-  const [selectedSize, setSelectedSize] = useState(product?.sizes?.[0]?.id ?? '');
+  const [selectedFlavor, setSelectedFlavor] = useState('');
+  const [selectedSize, setSelectedSize] = useState('');
   const [quantity, setQuantity] = useState(1);
+
+  // Auto-select if there is exactly 1 option
+  useEffect(() => {
+    if (product) {
+      if (product.flavors?.length === 1 && !selectedFlavor) {
+        // eslint-disable-next-line
+        setSelectedFlavor(product.flavors[0].id);
+      }
+      if (product.sizes?.length === 1 && !selectedSize) {
+        setSelectedSize(product.sizes[0].id);
+      }
+    }
+  }, [product, selectedFlavor, selectedSize]);
 
   /* Resolve price from selected size variant (or fall back to base price) */
   const activeSizeVariant = useMemo(
@@ -82,7 +438,20 @@ export default function ProductDetailPage(props: { params: Promise<{ id: string 
 
   /* ── 404 guard ────────────────────────────────────────────────── */
 
-  if (!product) {
+  /* ── 404 guard and Loading state ────────────────────────────────────────────────── */
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="flex flex-col items-center gap-4 text-slate-500">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600"></div>
+          <p className="font-medium animate-pulse">Ürün Detayları Yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isError || !product) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-center">
         <Package className="h-16 w-16 text-slate-300" />
@@ -103,64 +472,64 @@ export default function ProductDetailPage(props: { params: Promise<{ id: string 
   const accordionItems = [
     ...(product.features
       ? [
-          {
-            title: 'Özellikler',
-            content: (
-              <ul className="list-inside list-disc space-y-2">
-                {product.features.map((f, i) => (
-                  <li key={i}>{f}</li>
-                ))}
-              </ul>
-            ),
-          },
-        ]
+        {
+          title: 'Özellikler',
+          content: (
+            <ul className="list-inside list-disc space-y-2">
+              {product.features.map((f, i) => (
+                <li key={i}>{f}</li>
+              ))}
+            </ul>
+          ),
+        },
+      ]
       : []),
     ...(product.nutritionFacts
       ? [
-          {
-            title: 'Besin İçeriği',
-            content: (
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200">
-                    <th className="py-2 font-bold text-slate-800">Besin Değeri</th>
-                    <th className="py-2 font-bold text-slate-800">Porsiyon Başına</th>
-                    {product.nutritionFacts.some((nf) => nf.per100g) && (
-                      <th className="py-2 font-bold text-slate-800">100g Başına</th>
+        {
+          title: 'Besin İçeriği',
+          content: (
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-slate-200">
+                  <th className="py-2 font-bold text-slate-800">Besin Değeri</th>
+                  <th className="py-2 font-bold text-slate-800">Porsiyon Başına</th>
+                  {product.nutritionFacts.some((nf) => nf.per100g) && (
+                    <th className="py-2 font-bold text-slate-800">100g Başına</th>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {product.nutritionFacts.map((nf, i) => (
+                  <tr key={i} className="border-b border-slate-100 last:border-0">
+                    <td className="py-2 text-slate-600">{nf.label}</td>
+                    <td className="py-2 font-semibold text-slate-800">{nf.perServing}</td>
+                    {product.nutritionFacts!.some((n) => n.per100g) && (
+                      <td className="py-2 text-slate-600">{nf.per100g ?? '—'}</td>
                     )}
                   </tr>
-                </thead>
-                <tbody>
-                  {product.nutritionFacts.map((nf, i) => (
-                    <tr key={i} className="border-b border-slate-100 last:border-0">
-                      <td className="py-2 text-slate-600">{nf.label}</td>
-                      <td className="py-2 font-semibold text-slate-800">{nf.perServing}</td>
-                      {product.nutritionFacts!.some((n) => n.per100g) && (
-                        <td className="py-2 text-slate-600">{nf.per100g ?? '—'}</td>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ),
-          },
-        ]
+                ))}
+              </tbody>
+            </table>
+          ),
+        },
+      ]
       : []),
     ...(product.ingredients
       ? [
-          {
-            title: 'İçindekiler',
-            content: <p>{product.ingredients}</p>,
-          },
-        ]
+        {
+          title: 'İçindekiler',
+          content: <p>{product.ingredients}</p>,
+        },
+      ]
       : []),
     ...(product.usage
       ? [
-          {
-            title: 'Kullanım Şekli',
-            content: <p>{product.usage}</p>,
-          },
-        ]
+        {
+          title: 'Kullanım Şekli',
+          content: <p>{product.usage}</p>,
+        },
+      ]
       : []),
   ];
 
@@ -169,6 +538,11 @@ export default function ProductDetailPage(props: { params: Promise<{ id: string 
     displayOriginal && displayOriginal > displayPrice
       ? Math.round(((displayOriginal - displayPrice) / displayOriginal) * 100)
       : 0;
+  const canReviewProduct = orders.some(
+    (order) =>
+      order.status === 'delivered' &&
+      order.items.some((item) => String(item.product_id) === product.id),
+  );
 
   /* ════════════════════════ RENDER ════════════════════════════════ */
 
@@ -180,47 +554,21 @@ export default function ProductDetailPage(props: { params: Promise<{ id: string 
           Anasayfa
         </Link>
         <ChevronRight className="h-3.5 w-3.5" />
-        <button
-          onClick={() => {
-            const lastQ = sessionStorage.getItem('lastSearchQuery');
-            // If we applied a filter while on "All Products" (lastQ is empty),
-            // use history.back() to ensure filters are preserved when returning.
-            // If we arrived from another category page, navigate cleanly to /search.
-            if (window.history.length > 2 && !lastQ) {
-              window.history.back();
-            } else {
-              router.push('/search');
-            }
-          }}
+        <Link
+          href="/search"
           className="transition-colors hover:text-indigo-600 focus:outline-none"
         >
           Tüm Ürünler
-        </button>
+        </Link>
         {product.category && (
           <>
             <ChevronRight className="h-3.5 w-3.5" />
-            <button
-              onClick={() => {
-                const lastQ = sessionStorage.getItem('lastSearchQuery');
-                if (window.history.length > 2) {
-                  // If lastQ is empty (arrived from "All Products" section),
-                  // navigate directly to a fresh `q=Category` search page
-                  // instead of returning to the previous `?tags=Category` state.
-                  if (!lastQ) {
-                    router.push(`/search?q=${encodeURIComponent(product.category!)}`);
-                  } else {
-                    // If arrived from a specific category where sub-filters (like 'Kreatin') were chosen,
-                    // use history.back() to prevent those filters from resetting.
-                    window.history.back();
-                  }
-                } else {
-                  router.push(`/search?q=${encodeURIComponent(product.category!)}`);
-                }
-              }}
+            <Link
+              href={`/search?q=${encodeURIComponent(product.category)}`}
               className="transition-colors hover:text-indigo-600 focus:outline-none"
             >
               {product.category}
-            </button>
+            </Link>
           </>
         )}
         <ChevronRight className="h-3.5 w-3.5" />
@@ -248,7 +596,11 @@ export default function ProductDetailPage(props: { params: Promise<{ id: string 
           </div>
 
           {/* Rating */}
-          <RatingStars rating={product.rating} reviewCount={product.reviewCount} />
+          <RatingStars
+            rating={product.rating}
+            reviewCount={product.reviewCount}
+            commentCount={product.commentCount ?? 0}
+          />
 
           {/* Tags */}
           {product.tags && product.tags.length > 0 && (
@@ -268,12 +620,13 @@ export default function ProductDetailPage(props: { params: Promise<{ id: string 
           {/* Divider */}
           <hr className="border-slate-100" />
 
-          {/* Flavor Selector */}
+          {/* Flavor / Color Selector */}
           {product.flavors && product.flavors.length > 0 && (
             <FlavorSelector
               flavors={product.flavors}
               selectedId={selectedFlavor}
               onSelect={setSelectedFlavor}
+              label={isAccessory ? 'Renk:' : 'Aroma:'}
             />
           )}
 
@@ -331,11 +684,29 @@ export default function ProductDetailPage(props: { params: Promise<{ id: string 
               />
             )}
             <div className="flex-1">
-              <AddToCartButton 
+              <AddToCartButton
                 productId={product.id}
                 quantity={quantity}
-                variantId={selectedSize}
-                disabled={isOutOfStock} 
+                variantId={[selectedFlavor, selectedSize].filter(Boolean).join('-')}
+                disabled={isOutOfStock}
+                name={product.name}
+                price={product.price}
+                image={product.image || (product.images && product.images[0]) || '/placeholder.png'}
+                stockCount={product.stockCount}
+                flavor={product.flavors?.find(f => f.id === selectedFlavor)?.name}
+                size={product.sizes?.find(s => s.id === selectedSize)?.label}
+                onClick={(e) => {
+                  if (product.flavors && product.flavors.length > 1 && !selectedFlavor) {
+                    toast.error(isAccessory ? 'Lütfen bir renk seçiniz.' : 'Lütfen bir aroma seçiniz.');
+                    e.preventDefault();
+                    return;
+                  }
+                  if (product.sizes && product.sizes.length > 1 && !selectedSize) {
+                    toast.error('Lütfen bir boyut seçiniz.');
+                    e.preventDefault();
+                    return;
+                  }
+                }}
               />
             </div>
             <WishlistButton
@@ -381,6 +752,32 @@ export default function ProductDetailPage(props: { params: Promise<{ id: string 
           <ProductAccordion items={accordionItems} />
         </div>
       )}
+
+      <div className="mt-8">
+        {canReviewProduct ? (
+          <ReviewForm
+            productId={product.id}
+            isAuthenticated={isAuthenticated}
+            onSubmitted={() => {
+              queryClient.invalidateQueries({ queryKey: ['product', params.id] });
+              queryClient.invalidateQueries({ queryKey: ['products'] });
+              queryClient.invalidateQueries({ queryKey: ['product-reviews', params.id] });
+            }}
+          />
+        ) : (
+          <ReviewAccessNotice
+            isAuthenticated={isAuthenticated}
+            isLoading={isOrdersLoading}
+          />
+        )}
+      </div>
+
+      <div className="mt-8">
+        <ApprovedReviewsList
+          reviews={approvedReviews}
+          isLoading={isReviewsLoading}
+        />
+      </div>
     </div>
   );
 }

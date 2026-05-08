@@ -12,31 +12,25 @@ import {
   Package,
   MapPin,
   FileText,
-  Star,
-  MessageSquare,
   X,
   XCircle,
   Truck,
   Home,
   ArrowLeft,
+  RotateCcw,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
-import { fetchOrderById, cancelOrder } from '../api';
-import { Order, OrderItem } from '../types';
+import { fetchOrderById, cancelOrder, createRefundRequest } from '../api';
+import { Order, OrderItem, RefundRequest, RefundStatus } from '../types';
 import OrderStatusBadge from './OrderStatusBadge';
-import { mockProducts } from '@/features/products';
+import { fetchProducts } from '@/features/products';
+import type { Product } from '@/features/products';
 
 interface OrderDetailPageProps {
   orderId: string;
   isNewOrder?: boolean;
 }
-
-type MockReview = {
-  productId: string;
-  rating: number;
-  comment: string;
-};
 
 function formatTurkishDate(dateStr: string) {
   try {
@@ -52,22 +46,60 @@ function formatTurkishDate(dateStr: string) {
   }
 }
 
+function isWithin30Days(dateStr: string): boolean {
+  const diffMs = Date.now() - new Date(dateStr).getTime();
+  return diffMs / (1000 * 60 * 60 * 24) <= 30;
+}
+
+const REFUND_STATUS_MAP: Record<RefundStatus, { label: string; className: string }> = {
+  requested: { label: 'İade Talebi Alındı', className: 'bg-orange-50 text-orange-700 border-orange-200' },
+  approved_waiting_return: { label: 'Onaylandı – Ürün Bekleniyor', className: 'bg-blue-50 text-blue-700 border-blue-200' },
+  returned_received: { label: 'Ürün Teslim Alındı', className: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+  refunded: { label: 'İade Tamamlandı', className: 'bg-green-50 text-green-700 border-green-200' },
+  rejected: { label: 'İade Reddedildi', className: 'bg-red-50 text-red-700 border-red-200' },
+};
+
+function RefundStatusBadge({ status }: { status: RefundStatus }) {
+  const { label, className } = REFUND_STATUS_MAP[status] ?? REFUND_STATUS_MAP.requested;
+  return (
+    <span className={`inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded-md border text-xs font-semibold w-fit ${className}`}>
+      <RotateCcw className="w-3 h-3" />
+      {label}
+    </span>
+  );
+}
+
 function OrderItemRow({
   item,
-  isDelivered,
-  onReviewClick,
-  mockReview,
-  onDeleteReview,
+  canRefund,
+  refundRequest,
+  onRefundClick,
+  cachedProducts,
 }: {
   item: OrderItem;
-  isDelivered: boolean;
-  onReviewClick: (item: OrderItem) => void;
-  mockReview?: MockReview;
-  onDeleteReview: (productId: string) => void;
+  canRefund: boolean;
+  refundRequest: RefundRequest | null;
+  onRefundClick: (item: OrderItem) => void;
+  cachedProducts: Product[];
 }) {
-  const product = mockProducts.find((p) => p.id === String(item.product_id));
+  const product = cachedProducts.find((p) => p.id === String(item.product_id));
   const imageSrc = product?.image ?? '/placeholder.png';
-  const name = product?.name ?? item.name;
+  const name = item.name;
+
+  let flavor, size;
+  if (item.variant_name) {
+    try {
+      const parsed = JSON.parse(item.variant_name);
+      flavor = parsed.flavor;
+      size = parsed.size;
+    } catch {
+      const parts = item.variant_name.split(' / ');
+      flavor = parts[0];
+      size = parts[1];
+    }
+  }
+
+  const variantText = [flavor, size].filter(Boolean).join(' / ') || `${item.quantity} Paket`;
 
   return (
     <div className="flex items-start gap-3">
@@ -87,56 +119,24 @@ function OrderItemRow({
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-bold text-slate-800 line-clamp-2">{name}</p>
-        <p className="text-xs text-slate-400 mt-0.5">
-          {item.quantity} Paket
+        <p className="text-xs font-semibold text-slate-400 mt-0.5">
+          {variantText}
         </p>
-        {isDelivered && !mockReview && (
+        {/* T-323: refund status */}
+        {refundRequest && <RefundStatusBadge status={refundRequest.status} />}
+        {/* T-322: refund request button */}
+        {canRefund && !refundRequest && (
           <button
-            onClick={() => onReviewClick(item)}
-            className="mt-2 text-xs font-bold text-amber-600 hover:text-amber-700 flex items-center gap-1 transition-colors bg-amber-50 hover:bg-amber-100 px-2 py-1 rounded-md w-fit"
+            onClick={() => onRefundClick(item)}
+            className="mt-2 text-xs font-bold text-slate-600 hover:text-slate-800 flex items-center gap-1 transition-colors bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded-md w-fit"
           >
-            <Star className="w-3 h-3 fill-amber-600" />
-            Ürünü Değerlendir
+            <RotateCcw className="w-3 h-3" />
+            İade Talebi Oluştur
           </button>
-        )}
-        {isDelivered && mockReview && (
-          <div className="mt-3 p-3 bg-white border border-slate-200 rounded-xl space-y-2 max-w-sm">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-0.5">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <Star
-                    key={star}
-                    className={`w-3.5 h-3.5 ${
-                      star <= mockReview.rating
-                        ? 'fill-amber-400 text-amber-400'
-                        : 'fill-slate-100 text-slate-200'
-                    }`}
-                  />
-                ))}
-              </div>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => onReviewClick(item)}
-                  className="text-xs text-indigo-600 hover:text-indigo-700 font-bold transition-colors"
-                >
-                  Düzenle
-                </button>
-                <button
-                  onClick={() => onDeleteReview(String(item.product_id))}
-                  className="text-xs text-red-500 hover:text-red-700 font-bold transition-colors"
-                >
-                  Sil
-                </button>
-              </div>
-            </div>
-            {mockReview.comment && (
-              <p className="text-xs text-slate-600 italic">&quot;{mockReview.comment}&quot;</p>
-            )}
-          </div>
         )}
       </div>
       <div className="text-right shrink-0">
-        <p className="text-sm font-bold text-slate-900">{item.price * item.quantity} TL</p>
+        <p className="text-sm font-bold text-slate-900">{(Math.round(item.price * item.quantity * 100) / 100).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</p>
       </div>
     </div>
   );
@@ -242,7 +242,7 @@ function OrderTracker({ status }: { status: string }) {
   );
 }
 
-const CANCELLABLE_STATUSES = new Set(['created', 'processing']);
+const CANCELLABLE_STATUSES = new Set(['created', 'processing', 'pending', 'confirmed']);
 
 export default function OrderDetailPage({ orderId, isNewOrder }: OrderDetailPageProps) {
   const queryClient = useQueryClient();
@@ -256,56 +256,19 @@ export default function OrderDetailPage({ orderId, isNewOrder }: OrderDetailPage
     retry: 1,
   });
 
+  // Product catalogue cache for images
+  const { data: productsData } = useQuery({
+    queryKey: ['products', 'all'],
+    queryFn: () => fetchProducts(200),
+  });
+  const cachedProducts: Product[] = productsData?.items ?? [];
+
   const [isCancelling, setIsCancelling] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
-  const [reviewModalOpen, setReviewModalOpen] = useState(false);
-  const [reviewingItem, setReviewingItem] = useState<OrderItem | null>(null);
-  const [rating, setRating] = useState(0);
-  const [hoverRating, setHoverRating] = useState(0);
-  const [comment, setComment] = useState('');
-  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
-  const [mockReviews, setMockReviews] = useState<MockReview[]>([]);
-
-  const handleReviewClick = (item: OrderItem) => {
-    setReviewingItem(item);
-    const existingReview = mockReviews.find((r) => r.productId === String(item.product_id));
-    if (existingReview) {
-      setRating(existingReview.rating);
-      setHoverRating(existingReview.rating);
-      setComment(existingReview.comment);
-    } else {
-      setRating(0);
-      setHoverRating(0);
-      setComment('');
-    }
-    setReviewModalOpen(true);
-  };
-
-  const handleReviewSubmit = async () => {
-    if (rating === 0 || !reviewingItem) return;
-    setIsSubmittingReview(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 800));
-
-    setMockReviews((prev) => [
-      ...prev.filter((r) => r.productId !== String(reviewingItem.product_id)),
-      {
-        productId: String(reviewingItem.product_id),
-        rating,
-        comment,
-      },
-    ]);
-
-    setIsSubmittingReview(false);
-    setReviewModalOpen(false);
-  };
-
-  const handleDeleteReview = (productId: string) => {
-    if (window.confirm('Değerlendirmenizi silmek istediğinize emin misiniz?')) {
-      setMockReviews((prev) => prev.filter((r) => r.productId !== productId));
-    }
-  };
-
+  const [submittedRefunds, setSubmittedRefunds] = useState<Map<number, RefundRequest>>(new Map());
+  const [refundModalItem, setRefundModalItem] = useState<OrderItem | null>(null);
+  const [refundReason, setRefundReason] = useState('');
+  const [isSubmittingRefund, setIsSubmittingRefund] = useState(false);
   const handleCancelConfirm = async () => {
     if (!order) return;
     setIsCancelling(true);
@@ -322,7 +285,25 @@ export default function OrderDetailPage({ orderId, isNewOrder }: OrderDetailPage
     }
   };
 
+  const handleRefundSubmit = async () => {
+    if (!order || !refundModalItem) return;
+    setIsSubmittingRefund(true);
+    try {
+      const result = await createRefundRequest(order.id, refundModalItem.id, refundReason || undefined);
+      setSubmittedRefunds((prev) => new Map(prev).set(refundModalItem.id, result));
+      toast.success('İade talebiniz oluşturuldu.');
+      queryClient.invalidateQueries({ queryKey: ['order', orderId] });
+      setRefundModalItem(null);
+      setRefundReason('');
+    } catch {
+      toast.error('İade talebi oluşturulamadı. Lütfen tekrar deneyin.');
+    } finally {
+      setIsSubmittingRefund(false);
+    }
+  };
+
   const totalItems = order?.items.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
+  const canRefund = order?.status === 'delivered' && isWithin30Days(order?.created_at ?? '');
   const taxAmount = order
     ? parseFloat((order.total * 0.01 / 1.01).toFixed(2))
     : 0;
@@ -408,7 +389,7 @@ export default function OrderDetailPage({ orderId, isNewOrder }: OrderDetailPage
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-slate-500 font-medium">Sipariş Tutarı</span>
                     <span className="font-bold text-slate-800">
-                      {order.total} TL / {totalItems} ürün
+                      {(Math.round(order.total * 100) / 100).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL / {totalItems} ürün
                     </span>
                   </div>
                 </div>
@@ -458,8 +439,8 @@ export default function OrderDetailPage({ orderId, isNewOrder }: OrderDetailPage
                       {order.status !== 'cancelled' && order.status !== 'returned' && (
                         <button
                           onClick={() => setShowCancelConfirm(true)}
-                          disabled={!CANCELLABLE_STATUSES.has(order.status) || showCancelConfirm}
-                          title={!CANCELLABLE_STATUSES.has(order.status) ? 'Bu sipariş artık iptal edilemez' : undefined}
+                          disabled={!order || !CANCELLABLE_STATUSES.has(String(order.status || '').trim().toLowerCase()) || showCancelConfirm}
+                          title={!order || !CANCELLABLE_STATUSES.has(String(order.status || '').trim().toLowerCase()) ? 'Bu sipariş artık iptal edilemez' : undefined}
                           className="flex items-center gap-1.5 px-4 py-2.5 border text-sm font-bold rounded-xl transition-colors disabled:cursor-not-allowed disabled:opacity-50 border-red-200 text-red-600 hover:bg-red-50 disabled:border-slate-200 disabled:text-slate-400 disabled:hover:bg-transparent"
                         >
                           <XCircle className="w-4 h-4" />
@@ -493,18 +474,18 @@ export default function OrderDetailPage({ orderId, isNewOrder }: OrderDetailPage
                     <OrderItemRow
                       key={`${item.product_id}-${index}`}
                       item={item}
-                      isDelivered={order.status === 'delivered'}
-                      onReviewClick={handleReviewClick}
-                      mockReview={mockReviews.find((r) => r.productId === String(item.product_id))}
-                      onDeleteReview={handleDeleteReview}
+                      canRefund={canRefund}
+                      refundRequest={submittedRefunds.get(item.id) ?? item.refund_request ?? null}
+                      onRefundClick={setRefundModalItem}
+                      cachedProducts={cachedProducts}
                     />
                   ))}
                 </div>
                 <div className="pt-4 flex items-start justify-between">
                   <span className="text-lg font-black text-slate-900">Toplam</span>
                   <div className="text-right">
-                    <p className="text-xl font-black text-slate-900">{order.total} TL</p>
-                    <p className="text-xs text-slate-400 font-medium">Vergi {taxAmount} TL</p>
+                    <p className="text-xl font-black text-slate-900">{(Math.round(order.total * 100) / 100).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</p>
+                    <p className="text-xs text-slate-400 font-medium">Vergi {(Math.round(taxAmount * 100) / 100).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</p>
                     {(order.payment_method?.includes('Nakit') || order.payment_method?.includes('Kapıda')) && (
                       <p className="text-xs text-slate-400 font-medium mt-0.5">Kapıda Ödeme Hizmet Bedeli 59.90 TL</p>
                     )}
@@ -520,85 +501,48 @@ export default function OrderDetailPage({ orderId, isNewOrder }: OrderDetailPage
               </div>
             </div>
           )}
-          {/* Review Modal UI Simulation */}
-          {reviewModalOpen && reviewingItem && (
+          {/* Refund Request Modal */}
+          {refundModalItem && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
               <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
                 <div className="flex items-center justify-between p-5 border-b border-slate-100">
-                  <h3 className="text-lg font-bold text-slate-900">Ürünü Değerlendir</h3>
-                  <button onClick={() => setReviewModalOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                  <h3 className="text-lg font-bold text-slate-900">İade Talebi Oluştur</h3>
+                  <button
+                    onClick={() => { setRefundModalItem(null); setRefundReason(''); }}
+                    className="text-slate-400 hover:text-slate-600 transition-colors"
+                  >
                     <X className="w-5 h-5" />
                   </button>
                 </div>
-                <div className="p-5 space-y-6">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 relative bg-slate-50 rounded-xl border border-slate-100">
-                      <Image
-                        src={mockProducts.find((p) => p.id === String(reviewingItem.product_id))?.image ?? '/placeholder.png'}
-                        alt={reviewingItem.name}
-                        fill
-                        className="object-contain p-1"
-                        sizes="48px"
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-slate-900 line-clamp-1">{reviewingItem.name}</p>
-                      <p className="text-xs text-slate-500">Nasıl buldunuz?</p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="flex items-center gap-1">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <button
-                          key={star}
-                          type="button"
-                          className="p-1 focus:outline-none transition-transform hover:scale-110"
-                          onMouseEnter={() => setHoverRating(star)}
-                          onMouseLeave={() => setHoverRating(0)}
-                          onClick={() => setRating(star)}
-                        >
-                          <Star
-                            className={`w-8 h-8 ${
-                              star <= (hoverRating || rating)
-                                ? 'fill-amber-400 text-amber-400'
-                                : 'fill-slate-100 text-slate-200'
-                            } transition-colors`}
-                          />
-                        </button>
-                      ))}
-                    </div>
-                    <span className="text-sm font-medium text-slate-500 min-h-[20px]">
-                      {rating === 0 ? 'Puan verin' : rating === 1 ? 'Çok Kötü' : rating === 2 ? 'Kötü' : rating === 3 ? 'Normal' : rating === 4 ? 'İyi' : 'Mükemmel'}
-                    </span>
-                  </div>
-
+                <div className="p-5 space-y-4">
+                  <p className="text-sm text-slate-600">
+                    <span className="font-bold text-slate-800">{refundModalItem.name}</span> için iade talebi oluşturuyorsunuz.
+                  </p>
                   <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                      <MessageSquare className="w-4 h-4 text-slate-400" />
-                      Yorumunuz
+                    <label className="text-sm font-bold text-slate-700">
+                      İade Sebebi <span className="text-slate-400 font-normal">(isteğe bağlı)</span>
                     </label>
                     <textarea
-                      value={comment}
-                      onChange={(e) => setComment(e.target.value)}
-                      placeholder="Ürün hakkındaki düşüncelerinizi paylaşın..."
-                      className="w-full h-28 px-4 py-3 rounded-xl border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-600/20 outline-none resize-none text-sm transition-all"
+                      value={refundReason}
+                      onChange={(e) => setRefundReason(e.target.value)}
+                      placeholder="Ürünü iade etmek isteme sebebinizi belirtin..."
+                      className="w-full h-24 px-4 py-3 rounded-xl border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-600/20 outline-none resize-none text-sm transition-all"
                     />
                   </div>
                 </div>
                 <div className="p-5 bg-slate-50 border-t border-slate-100 flex gap-3">
                   <button
-                    onClick={() => setReviewModalOpen(false)}
+                    onClick={() => { setRefundModalItem(null); setRefundReason(''); }}
                     className="flex-1 px-4 py-2.5 text-sm font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
                   >
-                    İptal
+                    Vazgeç
                   </button>
                   <button
-                    onClick={handleReviewSubmit}
-                    disabled={rating === 0 || isSubmittingReview}
+                    onClick={handleRefundSubmit}
+                    disabled={isSubmittingRefund}
                     className="flex-1 px-4 py-2.5 text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                   >
-                    {isSubmittingReview ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Gönder'}
+                    {isSubmittingRefund ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Talebi Gönder'}
                   </button>
                 </div>
               </div>

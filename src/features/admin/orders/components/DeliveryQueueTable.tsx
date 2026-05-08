@@ -76,10 +76,12 @@ export default function DeliveryQueueTable({ orders, onViewOrder, onUpdateStatus
                 </td>
                 <td className="px-6 py-4 text-right">
                   <div className="flex items-center justify-end gap-2">
-                    <StatusChangeDropdown
-                      currentStatus={order.status}
-                      onStatusChange={(status) => onUpdateStatus(order.order_id, status)}
-                    />
+                    {order.status !== 'cancelled' && (
+                      <StatusChangeDropdown
+                        currentStatus={order.status}
+                        onStatusChange={(status) => onUpdateStatus(order.order_id, status)}
+                      />
+                    )}
                     <button
                       onClick={() => onViewOrder(order.order_id)}
                       className="rounded-lg p-2 text-indigo-600 transition-colors hover:bg-indigo-50 active:scale-95"

@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { addCartItem, fetchCartItems, updateCartItem as apiUpdateCartItem, removeCartItem as apiRemoveCartItem } from '../api/cart.api';
+import { addCartItem, bulkAddCartItems, fetchCartItems, updateCartItem as apiUpdateCartItem, removeCartItem as apiRemoveCartItem } from '../api/cart.api';
 import { useAuthStore } from '@/features/auth';
 import { toast } from 'sonner';
+import { fetchProductDetail } from '@/features/products/api/products.api';
 
 /**
  * Represents a single item in the cart.
@@ -16,6 +17,27 @@ export interface CartItem {
   variantId?: string;
   /** Remote Cart Item ID (only available when authenticated and synced) */
   cartItemId?: number;
+  /** Product display name — persisted so it shows before products are fetched */
+  name?: string;
+  /** Product price at time of adding — persisted for offline display */
+  price?: number;
+  /** Product image URL — persisted so cart shows image instantly */
+  image?: string;
+  /** Selected flavor name */
+  flavor?: string;
+  /** Selected size name */
+  size?: string;
+  /** Current stock count for client-side quantity limits */
+  stockCount?: number;
+}
+
+interface CartItemMeta {
+  name?: string;
+  price?: number;
+  image?: string;
+  flavor?: string;
+  size?: string;
+  stockCount?: number;
 }
 
 /** Zustand state for the guest cart */
@@ -27,11 +49,11 @@ interface CartState {
   /** Persistent flag to avoid redundant merge attempts for the same set of items */
   mergeAttempted: boolean;
   /** Add a product (or increase quantity) */
-  addItem: (productId: string, quantity?: number, variantId?: string) => Promise<void>;
+  addItem: (productId: string, quantity?: number, variantId?: string, meta?: CartItemMeta) => Promise<void>;
   /** Update quantity of a product */
-  updateItem: (productId: string, quantity: number) => Promise<void>;
+  updateItem: (productId: string, quantity: number, cartItemId?: number, maxQuantity?: number) => Promise<void>;
   /** Remove a product from the cart */
-  removeItem: (productId: string) => Promise<void>;
+  removeItem: (productId: string, cartItemId?: number) => Promise<void>;
   /** Clear the entire cart */
   clearCart: () => void;
   /** Merges the local guest cart with the server cart after login */
@@ -51,20 +73,24 @@ interface CartState {
  */
 interface CartItemServerResponse {
   id: number;
+  cart_id: number;
   product_id: number;
   quantity: number;
+  variant_name: string | null;
+  product_name?: string;
+  product_price?: number | string;
+  product_image?: string;
 }
 
-/**
- * Expected shape of an error response from the backend.
- */
-interface ApiError {
-  response?: {
-    data?: {
-      detail?: string;
-    };
-  };
-}
+const buildVariantNamePayload = (item: Pick<CartItem, 'flavor' | 'size' | 'variantId'>) => (
+  item.flavor || item.size || item.variantId
+    ? JSON.stringify({ flavor: item.flavor, size: item.size, variantId: item.variantId })
+    : undefined
+);
+
+const isSameVariantPayload = (left?: string | null, right?: string | null) => (
+  (left ?? null) === (right ?? null)
+);
 
 export const useCartStore = create<CartState>()(
   persist(
@@ -83,11 +109,50 @@ export const useCartStore = create<CartState>()(
 
         try {
           const serverItems = (await fetchCartItems()) as unknown as CartItemServerResponse[];
-          const mappedItems: CartItem[] = serverItems.map((item) => ({
-            productId: String(item.product_id),
-            quantity: item.quantity,
-            cartItemId: item.id, // Store the server ID
-          }));
+          const productDetails = await Promise.all(
+            [...new Set(serverItems.map((item) => item.product_id))].map(async (productId) => {
+              try {
+                const product = await fetchProductDetail(productId);
+                return [String(productId), product] as const;
+              } catch (error) {
+                console.error(`[CartStore] Failed to fetch product ${productId}:`, error);
+                return [String(productId), null] as const;
+              }
+            }),
+          );
+          const productsById = new Map(productDetails);
+
+          const mappedItems: CartItem[] = serverItems.map((item) => {
+            const product = productsById.get(String(item.product_id));
+            let flavor, size, variantId;
+            if (item.variant_name) {
+              try {
+                // Try parsing as JSON first (robust variant storage)
+                const parsed = JSON.parse(item.variant_name);
+                flavor = parsed.flavor;
+                size = parsed.size;
+                variantId = parsed.variantId;
+              } catch {
+                // Fallback for old string format like "Çikolata / 400g"
+                const parts = item.variant_name.split(' / ');
+                flavor = parts[0];
+                size = parts[1];
+              }
+            }
+            
+            return {
+              productId: String(item.product_id),
+              quantity: item.quantity,
+              cartItemId: item.id,
+              variantId: variantId,
+              name: item.product_name || product?.name || `Ürün ${item.product_id}`,
+              price: Number(item.product_price ?? product?.price) || 0,
+              image: item.product_image || product?.image || '/placeholder.png',
+              flavor,
+              size,
+              stockCount: product?.stockCount,
+            };
+          });
           
           set({ items: mappedItems, mergeAttempted: true });
         } catch (error) {
@@ -97,13 +162,34 @@ export const useCartStore = create<CartState>()(
         }
       },
 
-      addItem: async (productId, quantity = 1, variantId) => {
+      addItem: async (productId, quantity = 1, variantId, meta) => {
         const { items } = get();
         const isAuth = useAuthStore.getState().isAuthenticated;
         
         const existing = items.find(
           (i) => i.productId === productId && i.variantId === variantId,
         );
+
+        const maxStock = meta?.stockCount ?? existing?.stockCount;
+        const availableToAdd = typeof maxStock === 'number' ? maxStock - (existing?.quantity ?? 0) : undefined;
+
+        if (typeof maxStock === 'number' && maxStock <= 0) {
+          toast.error('Bu ürün stokta yok.');
+          return;
+        }
+
+        if (typeof availableToAdd === 'number' && availableToAdd <= 0) {
+          toast.warning('Bu üründen stokta daha fazla yok.');
+          return;
+        }
+
+        const safeQuantity = typeof availableToAdd === 'number'
+          ? Math.min(quantity, availableToAdd)
+          : quantity;
+
+        if (safeQuantity < quantity) {
+          toast.warning(`Stokta en fazla ${maxStock} adet var.`);
+        }
 
         const previousItems = [...items]; // Save for rollback
 
@@ -112,14 +198,14 @@ export const useCartStore = create<CartState>()(
           set({
             items: items.map((i) =>
               i.productId === productId && i.variantId === variantId
-                ? { ...i, quantity: i.quantity + quantity }
+                ? { ...i, quantity: i.quantity + safeQuantity, ...meta }
                 : i,
             ),
             mergeAttempted: false,
           });
         } else {
           set({
-            items: [...items, { productId, quantity, variantId }],
+            items: [...items, { productId, quantity: safeQuantity, variantId, ...meta }],
             mergeAttempted: false,
           });
         }
@@ -129,11 +215,12 @@ export const useCartStore = create<CartState>()(
           try {
             if (existing && existing.cartItemId) {
               // Item exists on server, update its quantity
-              const newQuantity = existing.quantity + quantity;
+              const newQuantity = existing.quantity + safeQuantity;
               await apiUpdateCartItem(existing.cartItemId, newQuantity);
             } else {
               // Item is completely new on server
-              const response = (await addCartItem(productId, quantity)) as unknown as CartItemServerResponse;
+              const variantNamePayload = buildVariantNamePayload({ flavor: meta?.flavor, size: meta?.size, variantId });
+              const response = (await addCartItem(productId, safeQuantity, variantNamePayload)) as unknown as CartItemServerResponse;
               // Add the new cartItemId to our optimistically created local item
               set({
                 items: get().items.map((i) => 
@@ -154,27 +241,40 @@ export const useCartStore = create<CartState>()(
         }
       },
 
-      updateItem: async (productId, quantity) => {
+      updateItem: async (productId, quantity, cartItemId?: number, maxQuantity?: number) => {
         if (quantity <= 0) {
-          await get().removeItem(productId);
+          await get().removeItem(productId, cartItemId);
           return;
         }
 
         const { items } = get();
         const isAuth = useAuthStore.getState().isAuthenticated;
-        const targetItem = items.find((i) => i.productId === productId);
+        
+        // Find specific target (prioritize exact cartItemId if we have duplicates)
+        const targetItem = cartItemId 
+          ? items.find((i) => i.cartItemId === cartItemId)
+          : items.find((i) => i.productId === productId);
+          
+        if (!targetItem) return;
+
+        const stockLimit = maxQuantity ?? targetItem.stockCount;
+        if (typeof stockLimit === 'number' && quantity > stockLimit) {
+          toast.warning(`Stokta en fazla ${stockLimit} adet var.`);
+          return;
+        }
+
         const previousItems = [...items]; // Save for rollback
 
-        // Optimistic Update
+        // Optimistic Update: Only update the SPECIFIC item we clicked on
         set({
           items: items.map((i) =>
-            i.productId === productId ? { ...i, quantity } : i,
+            i === targetItem ? { ...i, quantity } : i,
           ),
           mergeAttempted: false,
         });
 
         // Server Sync
-        if (isAuth && targetItem?.cartItemId) {
+        if (isAuth && targetItem.cartItemId) {
           try {
             await apiUpdateCartItem(targetItem.cartItemId, quantity);
           } catch (error) {
@@ -182,13 +282,12 @@ export const useCartStore = create<CartState>()(
             toast.error('Stok miktarı güncellenemedi.');
             set({ items: previousItems }); // Rollback
           }
-        } else if (isAuth && !targetItem?.cartItemId) {
-          // Recovery edge-case: item is local but missing ID, so we add it directly
+        } else if (isAuth && !targetItem.cartItemId) {
           try {
-             const response = (await addCartItem(productId, quantity)) as unknown as CartItemServerResponse;
+             const response = (await addCartItem(productId, quantity, buildVariantNamePayload(targetItem))) as unknown as CartItemServerResponse;
              set({
                 items: get().items.map((i) => 
-                  i.productId === productId
+                  i === targetItem
                     ? { ...i, cartItemId: response.id }
                     : i
                 )
@@ -200,15 +299,21 @@ export const useCartStore = create<CartState>()(
         }
       },
 
-      removeItem: async (productId) => {
+      removeItem: async (productId, cartItemId?: number) => {
         const { items } = get();
         const isAuth = useAuthStore.getState().isAuthenticated;
-        const targetItem = items.find((i) => i.productId === productId);
+        
+        const targetItem = cartItemId 
+          ? items.find((i) => i.cartItemId === cartItemId)
+          : items.find((i) => i.productId === productId);
+
+        if (!targetItem) return;
+        
         const previousItems = [...items]; // Save for rollback
 
-        // Optimistic Delete
+        // Optimistic Delete: Only delete the SPECIFIC item
         set({
-          items: items.filter((i) => i.productId !== productId),
+          items: items.filter((i) => i !== targetItem),
           mergeAttempted: false,
         });
 
@@ -217,9 +322,15 @@ export const useCartStore = create<CartState>()(
           try {
             await apiRemoveCartItem(targetItem.cartItemId);
           } catch (error) {
+            // If 404 → item already gone from server, keep local delete (don't rollback)
+            const status = (error as { response?: { status?: number } })?.response?.status;
+            if (status === 404) {
+              console.warn('[CartStore] Cart item already removed from server, keeping local delete.');
+              return;
+            }
             console.error('[CartStore] Failed to remove item from server:', error);
             toast.error('Ürün silinemedi.');
-            set({ items: previousItems }); // Rollback
+            set({ items: previousItems }); // Rollback only on non-404 errors
           }
         }
       },
@@ -237,43 +348,54 @@ export const useCartStore = create<CartState>()(
           return;
         }
 
+        const unsyncedItems = items.filter((item) => !item.cartItemId);
+        if (unsyncedItems.length === 0) {
+          await fetchServerCart();
+          return;
+        }
+
         set({ isMerging: true });
 
-        const succeeded: string[] = [];
-        const failed: { productId: string; reason: string }[] = [];
-        const updatedLocalItems: CartItem[] = [];
-
         try {
-          for (const item of items) {
-            try {
-              const response = (await addCartItem(item.productId, item.quantity)) as unknown as CartItemServerResponse;
-              succeeded.push(item.productId);
-              // Store cart_item_id locally immediately, so if fetch fails we are safe
-              updatedLocalItems.push({ ...item, cartItemId: response.id });
-            } catch (error) {
-              let reason = 'Bilinmeyen bir hata oluştu';
-              const apiError = error as ApiError;
-              if (apiError.response?.data?.detail) {
-                reason = apiError.response.data.detail;
-              }
-              failed.push({ productId: item.productId, reason });
-              // Keep failed items exactly as they were
-              updatedLocalItems.push(item);
-            }
+          // Build bulk payload from local guest cart
+          const bulkItems = unsyncedItems
+            .map((item) => ({
+              product_id: parseInt(item.productId),
+              quantity: item.quantity,
+              variant_name: buildVariantNamePayload(item),
+            }))
+            .filter((i) => !isNaN(i.product_id) && i.product_id > 0);
+
+          if (bulkItems.length === 0) {
+            await fetchServerCart();
+            return;
           }
 
-          // Always set items to updated array with new cartItemIds
+          const result = await bulkAddCartItems(bulkItems);
+
+          // Map server-assigned IDs back to local items
+          const updatedLocalItems = items.map((localItem) => {
+            const added = result.added.find(
+              (a) => String(a.product_id) === localItem.productId
+                && isSameVariantPayload(a.variant_name, buildVariantNamePayload(localItem))
+            );
+            return added ? { ...localItem, cartItemId: added.id } : localItem;
+          });
+
           set({ items: updatedLocalItems, mergeAttempted: true });
 
-          if (failed.length > 0 && succeeded.length > 0) {
-            toast.warning(`${succeeded.length} ürün hesabınıza aktarıldı.`, {
-              description: `${failed.length} ürün aktarılamadı ve sepetinizde kaldı.`,
+          const rejectedCount = result.rejected.length;
+          const addedCount = result.added.length;
+
+          if (rejectedCount > 0 && addedCount > 0) {
+            toast.warning(`${addedCount} ürün hesabınıza aktarıldı.`, {
+              description: `${rejectedCount} ürün aktarılamadı (stok yetersiz olabilir).`,
             });
-          } else if (succeeded.length > 0) {
+          } else if (addedCount > 0) {
             toast.success('Misafir sepetiniz hesabınızla birleştirildi!');
           }
 
-          // Fetch the final state of the server cart as absolute source of truth
+          // Fetch the final state from server as absolute source of truth
           await fetchServerCart();
 
         } catch (error) {

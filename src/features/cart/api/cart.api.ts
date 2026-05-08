@@ -1,14 +1,40 @@
 import apiClient from '@/lib/api-client';
 
+export interface BulkCartItem {
+  product_id: number;
+  quantity: number;
+  variant_name?: string;
+}
+
+export interface BulkCartAddResponse {
+  added: {
+    id: number;
+    cart_id: number;
+    product_id: number;
+    quantity: number;
+    variant_name?: string | null;
+  }[];
+  rejected: { product_id: number; reason: string }[];
+}
+
 /**
  * POST /api/v1/cart/items
  * Adds a single item to the server-side cart.
  */
-export const addCartItem = async (productId: string, quantity: number) => {
+export const addCartItem = async (productId: string, quantity: number, variantName?: string) => {
   return apiClient.post('/v1/cart/items', {
     product_id: parseInt(productId),
-    quantity
+    quantity,
+    variant_name: variantName,
   });
+};
+
+/**
+ * POST /api/v1/cart/items/bulk
+ * Adds multiple items to the cart in a single request.
+ */
+export const bulkAddCartItems = async (items: BulkCartItem[]): Promise<BulkCartAddResponse> => {
+  return apiClient.post('/v1/cart/items/bulk', { items }) as unknown as BulkCartAddResponse;
 };
 
 /**
@@ -34,4 +60,3 @@ export const updateCartItem = async (cartItemId: number, quantity: number) => {
 export const removeCartItem = async (cartItemId: number) => {
   return apiClient.delete(`/v1/cart/items/${cartItemId}`);
 };
-

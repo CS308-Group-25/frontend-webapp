@@ -7,7 +7,7 @@ import type { Category } from '../types/category.types';
 export const mockCategories: Category[] = [
   {
     id: 'cat-1',
-    name: 'Protein',
+    name: 'Protein Tozu',
     description: 'Whey, kazein ve bitkisel protein tozları.',
     productCount: 2,
     createdAt: '2024-01-10T08:00:00Z',

@@ -30,11 +30,18 @@ export interface Product {
   images?: string[];      // Gallery images for detail page
   rating: number; // 0–5
   reviewCount: number;
+  commentCount?: number;
   stockStatus: StockStatus;
   stockCount?: number; // Shown when status is low_stock or as explicit count
 
   isNew?: boolean;
   category?: string;
+  brand?: string;          // Extracted brand from backend
+  model?: string;
+  serialNumber?: string;
+  warrantyStatus?: string;
+  distributor?: string;
+  subType?: string;        // Product subcategory from backend
   tags?: string[];         // e.g. ["Vejetaryen", "Glutensiz"]
 
   // Variant selectors (detail page)

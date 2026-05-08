@@ -8,11 +8,23 @@ const STATUS_CONFIG: Record<OrderStatus, { label: string; className: string }> =
     label: 'Oluşturuldu',
     className: 'text-blue-700 bg-blue-50 border-blue-200',
   },
+  pending: {
+    label: 'Oluşturuldu',
+    className: 'text-blue-700 bg-blue-50 border-blue-200',
+  },
+  confirmed: {
+    label: 'Oluşturuldu',
+    className: 'text-blue-700 bg-blue-50 border-blue-200',
+  },
   processing: {
     label: 'Hazırlanıyor',
     className: 'text-amber-700 bg-amber-50 border-amber-200',
   },
   shipped: {
+    label: 'Kargoya Verildi',
+    className: 'text-purple-700 bg-purple-50 border-purple-200',
+  },
+  in_transit: {
     label: 'Kargoya Verildi',
     className: 'text-purple-700 bg-purple-50 border-purple-200',
   },

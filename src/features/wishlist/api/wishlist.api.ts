@@ -26,3 +26,11 @@ export const addWishlistItem = async (productId: string) => {
 export const removeWishlistItem = async (productId: string) => {
   return apiClient.delete(`/v1/wishlist/items/${productId}`);
 };
+
+/**
+ * DELETE /api/v1/wishlist/items
+ * Removes all products from the server-side wishlist.
+ */
+export const clearWishlistItems = async () => {
+  return apiClient.delete('/v1/wishlist/items');
+};
