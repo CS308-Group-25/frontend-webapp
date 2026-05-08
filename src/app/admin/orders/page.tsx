@@ -2,11 +2,11 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
-import { Truck } from 'lucide-react';
+import { Truck, ShieldX } from 'lucide-react';
 import DeliveryQueueTable from '@/features/admin/orders/components/DeliveryQueueTable';
 import { fetchAdminOrders, updateOrderStatus } from '@/features/admin/orders/api';
-import { mockOrders, filterOrdersByStatus } from '@/features/admin/orders/data/mock-orders';
 import { AdminOrder, OrderStatus } from '@/features/admin/orders/types';
+import { useAuthStore } from '@/features/auth';
 
 const STATUS_OPTIONS: { value: OrderStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'Tüm Siparişler' },
@@ -17,23 +17,31 @@ const STATUS_OPTIONS: { value: OrderStatus | 'all'; label: string }[] = [
 ];
 
 export default function AdminDeliveryQueuePage() {
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
   const [selectedStatus, setSelectedStatus] = useState<OrderStatus | undefined>(undefined);
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const isAuthorized = isAuthenticated && user?.role === 'product_manager';
+
+  const loadOrders = () => {
+    setFetchError(false);
+    setLoading(true);
     fetchAdminOrders()
       .then(setOrders)
-      .catch(() => {
-        console.warn('API unavailable, using mock data');
-        setOrders(mockOrders);
-      })
+      .catch(() => setFetchError(true))
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => {
+    if (!isAuthorized) return;
+    loadOrders();
+  }, [isAuthorized]);
 
   const filteredOrders = useMemo(
-    () => filterOrdersByStatus(orders, selectedStatus),
+    () => selectedStatus ? orders.filter((o) => o.status === selectedStatus) : orders,
     [orders, selectedStatus]
   );
 
@@ -58,12 +66,68 @@ export default function AdminDeliveryQueuePage() {
     }
   };
 
+  if (authLoading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent"></div>
+          <p className="text-sm font-medium text-slate-500">Yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthorized) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <div className="p-4 bg-red-50 rounded-2xl">
+            <ShieldX className="h-10 w-10 text-red-500" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-slate-900">Yetkisiz Erişim</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Bu sayfaya erişim için ürün yöneticisi yetkisi gereklidir.
+            </p>
+          </div>
+          <Link href="/" className="text-sm font-medium text-indigo-600 hover:underline">
+            Ana Sayfaya Dön
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent"></div>
           <p className="text-sm font-medium text-slate-500">Siparişler yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <div className="p-4 bg-red-50 rounded-2xl">
+            <ShieldX className="h-10 w-10 text-red-500" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-slate-900">Siparişler Yüklenemedi</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Bir hata oluştu. Lütfen sayfayı yenileyip tekrar deneyin.
+            </p>
+          </div>
+          <button
+            onClick={loadOrders}
+            className="text-sm font-medium text-indigo-600 hover:underline"
+          >
+            Tekrar Dene
+          </button>
         </div>
       </div>
     );
