@@ -22,6 +22,12 @@ function detectCardBrand(cardNumber: string): string {
   return 'Unknown';
 }
 
+function getPaymentMethodLabel(method: PaymentMethod, cardNumber: string): string {
+  if (method === 'cod_cash') return 'Kapıda Ödeme (Nakit)';
+  if (method === 'cod_card') return 'Kapıda Ödeme (Kredi Kartı)';
+  return cardNumber ? detectCardBrand(cardNumber) : 'Kredi Kartı';
+}
+
 export default function CheckoutPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -90,7 +96,7 @@ export default function CheckoutPage() {
         delivery_address: deliveryAddress,
         card_number: rawCardNumber,
         card_last4: rawCardNumber.slice(-4),
-        card_brand: rawCardNumber ? detectCardBrand(rawCardNumber) : '',
+        card_brand: getPaymentMethodLabel(method, rawCardNumber),
       };
 
       const order = await createOrder(payload);

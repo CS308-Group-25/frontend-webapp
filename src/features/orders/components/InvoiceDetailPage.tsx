@@ -91,6 +91,7 @@ export default function InvoiceDetailPage({ orderId }: InvoiceDetailPageProps) {
   const invoiceAddress = invoice
     ? splitAddressAndPhone(invoice.delivery_address)
     : { address: '', phone: '' };
+  const invoiceNumber = invoice?.invoice_number ?? `INV-${invoice?.invoice_id ?? ''}`;
 
   const handlePrint = () => {
     window.print();
@@ -119,7 +120,7 @@ export default function InvoiceDetailPage({ orderId }: InvoiceDetailPageProps) {
       const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
 
       pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`Fatura_INV-${invoice.invoice_id}.pdf`);
+      pdf.save(`Fatura_${invoiceNumber}.pdf`);
     } catch (error) {
       console.error('Error generating PDF:', error);
       alert('PDF oluşturulurken bir hata oluştu.');
@@ -227,7 +228,7 @@ export default function InvoiceDetailPage({ orderId }: InvoiceDetailPageProps) {
                     <h2 className="text-4xl font-black tracking-tight">FATURA</h2>
                   </div>
                   <div className="text-right">
-                    <p className="text-2xl font-black">INV-{invoice.invoice_id}</p>
+                    <p className="text-2xl font-black">{invoiceNumber}</p>
                     <p className="text-indigo-200 text-sm mt-1">Sipariş #{invoice.order_id}</p>
                   </div>
                 </div>

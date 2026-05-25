@@ -120,6 +120,7 @@ export const fetchInvoice = async (orderId: string): Promise<Invoice> => {
 
   return {
     invoice_id: order.invoice_id ?? order.id + 1000,
+    invoice_number: `INV-${new Date(order.created_at).getFullYear()}-${String(order.id).padStart(5, '0')}`,
     order_id: order.id,
     created_at: order.created_at,
     customer_name: order.customer_name ?? '',
