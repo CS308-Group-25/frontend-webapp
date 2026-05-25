@@ -1,5 +1,10 @@
+import { Suspense } from 'react';
 import { AuthWidget } from '@/features/auth';
 
 export default function LoginPage() {
-  return <AuthWidget initialTab="login" />;
+  return (
+    <Suspense>
+      <AuthWidget initialTab="login" />
+    </Suspense>
+  );
 }
