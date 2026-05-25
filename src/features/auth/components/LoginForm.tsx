@@ -36,7 +36,7 @@ export default function LoginForm() {
       // Trigger cart + wishlist merge after login
       useCartStore.getState().mergeWithServer();
       useWishlistStore.getState().mergeWithServer();
-      router.push(returnTo || '/');
+      router.push(returnTo?.startsWith('/') ? returnTo : '/');
     } catch (err) {
       setApiError(
         typeof err === 'string'
