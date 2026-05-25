@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Download,
   FileText,
+  Printer,
   RefreshCw,
   ShieldX,
   X,
@@ -139,38 +140,43 @@ export default function AdminInvoicesPage() {
     };
   };
 
+  const createInvoicePdf = async (invoice: AdminInvoiceListItem) => {
+    setInvoiceForPdf({
+      invoice: buildInvoiceDocumentData(invoice),
+      invoiceNumber: invoice.invoice_number,
+    });
+
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+
+    const input = document.getElementById('admin-invoice-pdf-content');
+    if (!input) throw new Error('Invoice document could not be rendered.');
+
+    const dataUrl = await toPng(input, {
+      quality: 1,
+      pixelRatio: 2,
+    });
+
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+    });
+
+    const imgProps = pdf.getImageProperties(dataUrl);
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+    pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
+    return pdf;
+  };
+
   const handleDownloadPdf = async (invoice: AdminInvoiceListItem) => {
     setDownloadError(null);
     setDownloadingId(invoice.id);
 
     try {
-      setInvoiceForPdf({
-        invoice: buildInvoiceDocumentData(invoice),
-        invoiceNumber: invoice.invoice_number,
-      });
-
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-
-      const input = document.getElementById('admin-invoice-pdf-content');
-      if (!input) throw new Error('Invoice document could not be rendered.');
-
-      const dataUrl = await toPng(input, {
-        quality: 1,
-        pixelRatio: 2,
-      });
-
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4',
-      });
-
-      const imgProps = pdf.getImageProperties(dataUrl);
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-
-      pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      const pdf = await createInvoicePdf(invoice);
       pdf.save(`${invoice.invoice_number}.pdf`);
     } catch {
       setDownloadError('Fatura PDF dosyası indirilemedi.');
@@ -186,6 +192,48 @@ export default function AdminInvoicesPage() {
       invoiceNumber: invoice.invoice_number,
       source: invoice,
     });
+  };
+
+  const handlePrintInvoice = async (invoice: AdminInvoiceListItem) => {
+    setDownloadError(null);
+
+    try {
+      const pdf = await createInvoicePdf(invoice);
+      const blob = pdf.output('blob');
+      const blobUrl = URL.createObjectURL(blob);
+
+      // Create a hidden iframe to trigger the print dialog without opening a new tab
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.top = '-10000px';
+      iframe.style.left = '-10000px';
+      iframe.style.width = '1px';
+      iframe.style.height = '1px';
+      iframe.style.border = 'none';
+      document.body.appendChild(iframe);
+
+      iframe.onload = () => {
+        try {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+        } catch {
+          // Fallback: open in new tab if iframe print fails (e.g. cross-origin)
+          window.open(blobUrl, '_blank');
+        }
+
+        // Clean up iframe and blob URL after a delay to let print dialog finish
+        setTimeout(() => {
+          document.body.removeChild(iframe);
+          URL.revokeObjectURL(blobUrl);
+        }, 1000);
+      };
+
+      iframe.src = blobUrl;
+    } catch {
+      setDownloadError('Fatura yazdırma ekranı açılamadı.');
+    } finally {
+      setInvoiceForPdf(null);
+    }
   };
 
   if (authLoading) {
@@ -411,6 +459,14 @@ export default function AdminInvoicesPage() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handlePrintInvoice(previewInvoice.source)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50"
+                >
+                  <Printer className="h-4 w-4" />
+                  Yazdır
+                </button>
                 <button
                   type="button"
                   onClick={() => handleDownloadPdf(previewInvoice.source)}
