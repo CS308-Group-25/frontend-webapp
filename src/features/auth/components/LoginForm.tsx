@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Mail, Lock, Loader2 } from 'lucide-react';
 import { loginSchema, LoginFormValues } from '../schemas/login.schema';
 import { loginUser } from '../api/auth.api';
@@ -15,6 +15,8 @@ export default function LoginForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const returnTo = searchParams.get('returnTo');
 
   const {
     register,
@@ -34,7 +36,7 @@ export default function LoginForm() {
       // Trigger cart + wishlist merge after login
       useCartStore.getState().mergeWithServer();
       useWishlistStore.getState().mergeWithServer();
-      router.push('/');
+      router.push(returnTo || '/');
     } catch (err) {
       setApiError(
         typeof err === 'string'

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { toast } from 'sonner';
 import { useAuthStore } from '@/features/auth';
 
 /**
@@ -26,6 +27,7 @@ apiClient.interceptors.response.use(
       const { isAuthenticated, clearUser } = useAuthStore.getState();
       if (isAuthenticated) {
         clearUser();
+        toast.error('Oturumunuz sona erdi. Lütfen tekrar giriş yapın.');
       }
     }
 
