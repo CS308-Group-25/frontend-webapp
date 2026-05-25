@@ -47,6 +47,7 @@ export interface InvoiceItem {
 
 export interface Invoice {
   invoice_id: number;
+  invoice_number?: string;
   order_id: number;
   created_at: string;
   customer_name: string;
