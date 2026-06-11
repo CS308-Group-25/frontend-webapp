@@ -404,7 +404,7 @@ export default function Header() {
                         className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold text-slate-700 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
                       >
                         <Package className="h-4 w-4" />
-                        Products
+                        Ürün Fiyatlandırma
                       </Link>
                       <Link
                         href="/admin/refunds"

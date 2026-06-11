@@ -5,8 +5,8 @@ import SetPriceButton from './SetPriceButton';
 
 interface ProductTableProps {
   products: Product[];
-  onEdit: (product: Product) => void;
-  onDelete: (id: string) => void;
+  onEdit?: (product: Product) => void;
+  onDelete?: (id: string) => void;
   onSetPrice?: (productId: string, newPrice: number) => void;
 }
 
@@ -84,20 +84,24 @@ export default function ProductTable({ products, onEdit, onDelete, onSetPrice }:
                         onSuccess={(newPrice) => onSetPrice(product.id, newPrice)}
                       />
                     )}
-                    <button
-                      onClick={() => onEdit(product)}
-                      className="rounded-lg p-2 text-indigo-600 transition-colors hover:bg-indigo-50 active:scale-95"
-                      title="Düzenle"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => onDelete(product.id)}
-                      className="rounded-lg p-2 text-red-600 transition-colors hover:bg-red-50 active:scale-95"
-                      title="Sil"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    {onEdit && (
+                      <button
+                        onClick={() => onEdit(product)}
+                        className="rounded-lg p-2 text-indigo-600 transition-colors hover:bg-indigo-50 active:scale-95"
+                        title="Düzenle"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </button>
+                    )}
+                    {onDelete && (
+                      <button
+                        onClick={() => onDelete(product.id)}
+                        className="rounded-lg p-2 text-red-600 transition-colors hover:bg-red-50 active:scale-95"
+                        title="Sil"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

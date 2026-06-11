@@ -57,20 +57,7 @@ export default function AdminProductsPage() {
   };
 
   const handleSetPrice = (id: string, newPrice: number) => {
-    updateCache((prev) =>
-      prev.map((p) => {
-        if (p.id !== id) return p;
-        if (!p.sizes || p.sizes.length === 0) return { ...p, price: newPrice };
-        const ref = p.sizes[0].price || null;
-        const updatedSizes = p.sizes.map((s) => {
-          const scaled = ref
-            ? Math.round((s.price * newPrice / ref) * 100) / 100
-            : newPrice;
-          return { ...s, price: scaled };
-        });
-        return { ...p, price: newPrice, sizes: updatedSizes };
-      })
-    );
+    updateCache((prev) => prev.map((p) => (p.id === id ? { ...p, price: newPrice } : p)));
   };
 
   const sortedProducts = useMemo(() => {
@@ -141,13 +128,15 @@ export default function AdminProductsPage() {
               <option value="rating_asc">Rating (En Düşük)</option>
             </select>
           </div>
-          <button
-            onClick={() => { setEditingProduct(undefined); setIsModalOpen(true); }}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-indigo-500/20 transition-all hover:bg-indigo-700 hover:shadow-lg active:scale-95 sm:w-auto"
-          >
-            <PackagePlus className="h-5 w-5" />
-            Yeni Ürün
-          </button>
+          {user?.role === 'product_manager' && (
+            <button
+              onClick={() => { setEditingProduct(undefined); setIsModalOpen(true); }}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-indigo-500/20 transition-all hover:bg-indigo-700 hover:shadow-lg active:scale-95 sm:w-auto"
+            >
+              <PackagePlus className="h-5 w-5" />
+              Yeni Ürün
+            </button>
+          )}
         </div>
       </div>
 
@@ -163,8 +152,8 @@ export default function AdminProductsPage() {
       ) : (
         <ProductTable
           products={sortedProducts}
-          onEdit={(product) => { setEditingProduct(product); setIsModalOpen(true); }}
-          onDelete={handleDeleteProduct}
+          onEdit={user?.role === 'product_manager' ? (product) => { setEditingProduct(product); setIsModalOpen(true); } : undefined}
+          onDelete={user?.role === 'product_manager' ? handleDeleteProduct : undefined}
           onSetPrice={user?.role === 'sales_manager' ? handleSetPrice : undefined}
         />
       )}
