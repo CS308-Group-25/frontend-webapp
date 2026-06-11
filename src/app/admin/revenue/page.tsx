@@ -38,14 +38,11 @@ const fetchRevenueReport = async (from: string, to: string) => {
 export default function AdminRevenuePage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
   
-  // Set default dates: 30 days ago to today
-  const defaultTo = new Date().toISOString().split('T')[0];
-  const defaultFrom = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-
-  const [fromDate, setFromDate] = useState(defaultFrom);
-  const [toDate, setToDate] = useState(defaultTo);
-  const [appliedFromDate, setAppliedFromDate] = useState(defaultFrom);
-  const [appliedToDate, setAppliedToDate] = useState(defaultTo);
+  // Set default dates inside useState to avoid impure function calls during render
+  const [fromDate, setFromDate] = useState(() => new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+  const [toDate, setToDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [appliedFromDate, setAppliedFromDate] = useState(() => new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+  const [appliedToDate, setAppliedToDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [reportData, setReportData] = useState<RevenueReportResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
@@ -73,10 +70,12 @@ export default function AdminRevenuePage() {
   };
 
   const clearFilters = () => {
-    setFromDate(defaultFrom);
-    setToDate(defaultTo);
-    setAppliedFromDate(defaultFrom);
-    setAppliedToDate(defaultTo);
+    const freshFrom = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const freshTo = new Date().toISOString().split('T')[0];
+    setFromDate(freshFrom);
+    setToDate(freshTo);
+    setAppliedFromDate(freshFrom);
+    setAppliedToDate(freshTo);
   };
 
   const rangeLabel = `${appliedFromDate.replaceAll('-', '.')} - ${appliedToDate.replaceAll('-', '.')}`;
