@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   CalendarDays,
@@ -27,10 +27,12 @@ export interface RevenueReportResponse {
 }
 
 const fetchRevenueReport = async (from: string, to: string) => {
+  const safeFrom = from || '2000-01-01';
+  const safeTo = to || new Date().toISOString().split('T')[0];
   return apiClient.get<RevenueReportResponse>('/v1/admin/reports/revenue', {
     params: {
-      from_date: from,
-      to_date: to,
+      from_date: safeFrom,
+      to_date: safeTo,
     }
   }) as unknown as RevenueReportResponse;
 };
@@ -50,35 +52,78 @@ export default function AdminRevenuePage() {
   // Only Sales Manager is authorized for revenue report
   const isAuthorized = isAuthenticated && user?.role === 'sales_manager';
 
-  const loadReport = useCallback(() => {
-    setFetchError(false);
-    setLoading(true);
-    fetchRevenueReport(appliedFromDate, appliedToDate)
-      .then(setReportData)
-      .catch(() => setFetchError(true))
-      .finally(() => setLoading(false));
-  }, [appliedFromDate, appliedToDate]);
-
   useEffect(() => {
     if (!isAuthorized) return;
-    loadReport();
-  }, [isAuthorized, loadReport]);
+
+    let isMounted = true;
+    fetchRevenueReport(appliedFromDate, appliedToDate)
+      .then((data) => {
+        if (isMounted) {
+          setReportData(data);
+          setFetchError(false);
+        }
+      })
+      .catch(() => {
+        if (isMounted) setFetchError(true);
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isAuthorized, appliedFromDate, appliedToDate]);
+
+  const refreshReport = () => {
+    setLoading(true);
+    setFetchError(false);
+    fetchRevenueReport(appliedFromDate, appliedToDate)
+      .then((data) => {
+        setReportData(data);
+        setFetchError(false);
+      })
+      .catch(() => setFetchError(true))
+      .finally(() => setLoading(false));
+  };
 
   const applyFilters = () => {
+    if (fromDate === appliedFromDate && toDate === appliedToDate) {
+      return; // No changes to apply
+    }
+    setLoading(true);
+    setFetchError(false);
     setAppliedFromDate(fromDate);
     setAppliedToDate(toDate);
   };
 
   const clearFilters = () => {
-    const freshFrom = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const freshTo = new Date().toISOString().split('T')[0];
-    setFromDate(freshFrom);
-    setToDate(freshTo);
-    setAppliedFromDate(freshFrom);
-    setAppliedToDate(freshTo);
+    setFromDate('');
+    setToDate('');
+    if (appliedFromDate === '' && appliedToDate === '') {
+      return; // Already cleared, prevent infinite loading state
+    }
+    setLoading(true);
+    setFetchError(false);
+    setAppliedFromDate('');
+    setAppliedToDate('');
   };
 
-  const rangeLabel = `${appliedFromDate.replaceAll('-', '.')} - ${appliedToDate.replaceAll('-', '.')}`;
+  const rangeLabel = (() => {
+    const formatDateLabel = (value: string) => {
+      const parts = value.split('-');
+      if (parts.length === 3) {
+        return `${parts[2]}.${parts[1]}.${parts[0]}`;
+      }
+      return value;
+    };
+    if (!appliedFromDate && !appliedToDate) return 'Tüm zamanlar';
+    if (appliedFromDate && appliedToDate) {
+      return `${formatDateLabel(appliedFromDate)} - ${formatDateLabel(appliedToDate)}`;
+    }
+    if (appliedFromDate) return `${formatDateLabel(appliedFromDate)} sonrası`;
+    return `${formatDateLabel(appliedToDate)} öncesi`;
+  })();
 
   if (authLoading) {
     return (
@@ -140,7 +185,7 @@ export default function AdminRevenuePage() {
           </div>
         </div>
         <button
-          onClick={loadReport}
+          onClick={refreshReport}
           disabled={loading}
           className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:opacity-50"
         >
@@ -218,7 +263,7 @@ export default function AdminRevenuePage() {
             Lütfen bağlantınızı kontrol edip tekrar deneyin.
           </p>
           <button
-            onClick={loadReport}
+            onClick={refreshReport}
             className="mt-4 text-sm font-medium text-indigo-600 hover:underline"
           >
             Tekrar Dene
