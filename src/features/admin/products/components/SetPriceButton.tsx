@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Tag } from 'lucide-react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { patchProductPrice } from '../api';
 
@@ -13,6 +13,7 @@ interface SetPriceButtonProps {
 }
 
 export default function SetPriceButton({ productId, currentPrice, onSuccess }: SetPriceButtonProps) {
+  const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -21,6 +22,7 @@ export default function SetPriceButton({ productId, currentPrice, onSuccess }: S
     mutationFn: (price: number) => patchProductPrice(productId, price),
     onSuccess: (_, price) => {
       onSuccess(price);
+      queryClient.invalidateQueries({ queryKey: ['products', 'all'] });
       toast.success('Ürün fiyatı başarıyla güncellendi.');
       setIsEditing(false);
       setError(null);

@@ -1,60 +1,76 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { PackagePlus, ArrowDownUp } from 'lucide-react';
-import { mockProducts, Product } from '@/features/products';
+import { PackagePlus, ArrowDownUp, Loader2 } from 'lucide-react';
+import { Product, fetchProducts, PaginatedProductResponse } from '@/features/products';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import ProductTable from '@/features/admin/products/components/ProductTable';
 import ProductModal from '@/features/admin/products/components/ProductModal';
 import Link from 'next/link';
 import { useAuthStore } from '@/features/auth';
 
+const QUERY_KEY = ['admin', 'products'] as const;
+
 type SortOption = 'urgency' | 'name_asc' | 'price_asc' | 'price_desc' | 'stock_desc' | 'newest' | 'rating_asc' | 'rating_desc';
 
 export default function AdminProductsPage() {
   const user = useAuthStore((s) => s.user);
-  const [products, setProducts] = useState<Product[]>(mockProducts);
+  const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | undefined>();
   const [sortBy, setSortBy] = useState<SortOption>('urgency');
 
+  const { data, isLoading, isError } = useQuery({
+    queryKey: QUERY_KEY,
+    queryFn: () => fetchProducts(200),
+  });
+
+  const products = useMemo(() => data?.items ?? [], [data]);
+
+  const updateCache = (updater: (prev: Product[]) => Product[]) => {
+    queryClient.setQueryData<PaginatedProductResponse>(QUERY_KEY, (old) =>
+      old ? { ...old, items: updater(old.items) } : old
+    );
+  };
+
   const handleAddProduct = (newProductData: Omit<Product, 'id'>) => {
     const newProduct: Product = {
       ...newProductData,
-      id: Math.random().toString(36).substr(2, 9), // simple unique ID for local state
+      id: Math.random().toString(36).substr(2, 9),
       rating: 0,
       reviewCount: 0,
       isNew: true,
     };
-    
-    setProducts((prev) => [newProduct, ...prev]);
+    updateCache((prev) => [newProduct, ...prev]);
     setIsModalOpen(false);
   };
 
   const handleEditProduct = (updatedProduct: Product) => {
-    setProducts((prev) =>
-      prev.map((p) => (p.id === updatedProduct.id ? updatedProduct : p))
-    );
+    updateCache((prev) => prev.map((p) => (p.id === updatedProduct.id ? updatedProduct : p)));
     setIsModalOpen(false);
   };
 
   const handleDeleteProduct = (id: string) => {
     if (confirm('Bu ürünü silmek istediğinize emin misiniz?')) {
-      setProducts((prev) => prev.filter((p) => p.id !== id));
+      updateCache((prev) => prev.filter((p) => p.id !== id));
     }
   };
 
-  const openAddModal = () => {
-    setEditingProduct(undefined);
-    setIsModalOpen(true);
-  };
-
-  const openEditModal = (product: Product) => {
-    setEditingProduct(product);
-    setIsModalOpen(true);
-  };
-
   const handleSetPrice = (id: string, newPrice: number) => {
-    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, price: newPrice } : p)));
+    updateCache((prev) =>
+      prev.map((p) => {
+        if (p.id !== id) return p;
+        if (!p.sizes || p.sizes.length === 0) return { ...p, price: newPrice };
+        const ref = p.sizes[0].price || null;
+        const updatedSizes = p.sizes.map((s) => {
+          const scaled = ref
+            ? Math.round((s.price * newPrice / ref) * 100) / 100
+            : newPrice;
+          return { ...s, price: scaled };
+        });
+        return { ...p, price: newPrice, sizes: updatedSizes };
+      })
+    );
   };
 
   const sortedProducts = useMemo(() => {
@@ -66,7 +82,6 @@ export default function AdminProductsPage() {
         return list.sort((a, b) => {
           const urgencyDiff = urgencyMap[a.stockStatus] - urgencyMap[b.stockStatus];
           if (urgencyDiff !== 0) return urgencyDiff;
-          // secondary sort by stock count if same urgency
           return (a.stockCount || 0) - (b.stockCount || 0);
         });
       }
@@ -83,9 +98,6 @@ export default function AdminProductsPage() {
       case 'rating_desc':
         return list.sort((a, b) => (b.rating || 0) - (a.rating || 0));
       case 'newest':
-        // list uses insertion order natively (we prepend new products). 
-        // We can just return it to respect literal newest-first.
-        // For mock items, pushing 'isNew' items up inside existing order visually helps.
         return list.sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0));
       default:
         return list;
@@ -130,7 +142,7 @@ export default function AdminProductsPage() {
             </select>
           </div>
           <button
-            onClick={openAddModal}
+            onClick={() => { setEditingProduct(undefined); setIsModalOpen(true); }}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-indigo-500/20 transition-all hover:bg-indigo-700 hover:shadow-lg active:scale-95 sm:w-auto"
           >
             <PackagePlus className="h-5 w-5" />
@@ -140,12 +152,22 @@ export default function AdminProductsPage() {
       </div>
 
       {/* Content */}
-      <ProductTable
-        products={sortedProducts}
-        onEdit={openEditModal}
-        onDelete={handleDeleteProduct}
-        onSetPrice={user?.role === 'sales_manager' ? handleSetPrice : undefined}
-      />
+      {isLoading ? (
+        <div className="flex min-h-[300px] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+        </div>
+      ) : isError ? (
+        <div className="flex min-h-[300px] items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+          <p className="text-sm font-medium text-red-500">Ürünler yüklenirken bir hata oluştu.</p>
+        </div>
+      ) : (
+        <ProductTable
+          products={sortedProducts}
+          onEdit={(product) => { setEditingProduct(product); setIsModalOpen(true); }}
+          onDelete={handleDeleteProduct}
+          onSetPrice={user?.role === 'sales_manager' ? handleSetPrice : undefined}
+        />
+      )}
 
       {/* Modal */}
       <ProductModal
