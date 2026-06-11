@@ -6,10 +6,12 @@ import { mockProducts, Product } from '@/features/products';
 import ProductTable from '@/features/admin/products/components/ProductTable';
 import ProductModal from '@/features/admin/products/components/ProductModal';
 import Link from 'next/link';
+import { useAuthStore } from '@/features/auth';
 
 type SortOption = 'urgency' | 'name_asc' | 'price_asc' | 'price_desc' | 'stock_desc' | 'newest' | 'rating_asc' | 'rating_desc';
 
 export default function AdminProductsPage() {
+  const user = useAuthStore((s) => s.user);
   const [products, setProducts] = useState<Product[]>(mockProducts);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | undefined>();
@@ -49,6 +51,10 @@ export default function AdminProductsPage() {
   const openEditModal = (product: Product) => {
     setEditingProduct(product);
     setIsModalOpen(true);
+  };
+
+  const handleSetPrice = (id: string, newPrice: number) => {
+    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, price: newPrice } : p)));
   };
 
   const sortedProducts = useMemo(() => {
@@ -138,6 +144,7 @@ export default function AdminProductsPage() {
         products={sortedProducts}
         onEdit={openEditModal}
         onDelete={handleDeleteProduct}
+        onSetPrice={user?.role === 'sales_manager' ? handleSetPrice : undefined}
       />
 
       {/* Modal */}
