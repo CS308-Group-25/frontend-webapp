@@ -20,7 +20,13 @@ import StockBadge from '@/features/products/components/StockBadge';
 import { toast } from 'sonner';
 
 /* ── helpers ── */
-function RatingStars({ rating, reviewCount }: { rating: number; reviewCount: number }) {
+function RatingStars({
+  rating,
+  reviewCount,
+}: {
+  rating: number;
+  reviewCount: number;
+}) {
   return (
     <div className="flex items-center gap-1.5">
       <div className="flex items-center gap-0.5">
@@ -34,8 +40,8 @@ function RatingStars({ rating, reviewCount }: { rating: number; reviewCount: num
                 filled
                   ? 'fill-amber-400 text-amber-400'
                   : half
-                  ? 'fill-amber-400/50 text-amber-400'
-                  : 'fill-slate-200 text-slate-200'
+                    ? 'fill-amber-400/50 text-amber-400'
+                    : 'fill-slate-200 text-slate-200'
               }`}
             />
           );
@@ -48,13 +54,23 @@ function RatingStars({ rating, reviewCount }: { rating: number; reviewCount: num
   );
 }
 
-function DiscountBadge({ price, originalPrice }: { price: number; originalPrice: number }) {
+function DiscountBadge({
+  price,
+  originalPrice,
+}: {
+  price: number;
+  originalPrice: number;
+}) {
   const discount = Math.round(((originalPrice - price) / originalPrice) * 100);
   return (
-    <div className="absolute -right-2 -top-2 z-10 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-red-600 shadow-lg shadow-red-500/30">
+    <div className="absolute -top-2 -right-2 z-10 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-red-600 shadow-lg shadow-red-500/30">
       <div className="text-center leading-tight">
-        <span className="block text-xs font-extrabold text-white">%{discount}</span>
-        <span className="block text-[9px] font-bold uppercase text-red-100">İndirim</span>
+        <span className="block text-xs font-extrabold text-white">
+          %{discount}
+        </span>
+        <span className="block text-[9px] font-bold text-red-100 uppercase">
+          İndirim
+        </span>
       </div>
     </div>
   );
@@ -63,7 +79,7 @@ function DiscountBadge({ price, originalPrice }: { price: number; originalPrice:
 /** Skeleton card shown while product details are loading */
 function SkeletonCard() {
   return (
-    <div className="flex flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm animate-pulse">
+    <div className="flex animate-pulse flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
       <div className="aspect-square bg-slate-100" />
       <div className="flex flex-col gap-3 p-4">
         <div className="h-4 w-3/4 rounded-lg bg-slate-100" />
@@ -86,38 +102,51 @@ export default function WishlistPage() {
   const [fetchError, setFetchError] = useState(false);
 
   /* ── Load products once on mount (or when auth changes) ── */
-  const loadProducts = useCallback(async (ids: string[]) => {
-    if (ids.length === 0) {
-      setProducts([]);
-      setIsInitialLoading(false);
-      return;
-    }
-
-    setIsInitialLoading(true);
-    setFetchError(false);
-
-    // Fetch all products in parallel
-    const results = await Promise.allSettled(
-      ids.map((id) => fetchProductDetail(id)),
-    );
-
-    const loaded: Product[] = [];
-    let hadError = false;
-
-    results.forEach((result, idx) => {
-      if (result.status === 'fulfilled') {
-        loaded.push(result.value);
-      } else {
-        console.error(`[WishlistPage] Failed to fetch product ${ids[idx]}:`, result.reason);
-        hadError = true;
+  const loadProducts = useCallback(
+    async (ids: string[]) => {
+      if (ids.length === 0) {
+        setProducts([]);
+        setIsInitialLoading(false);
+        return;
       }
-    });
 
-    setProducts(loaded);
-    setFetchError(hadError && loaded.length === 0);
-    setIsInitialLoading(false);
-  }, []);
+      setIsInitialLoading(true);
+      setFetchError(false);
 
+      const results = await Promise.allSettled(
+        ids.map((id) => fetchProductDetail(id))
+      );
+
+      const loaded: Product[] = [];
+      let hadNetworkError = false;
+
+      results.forEach((result, idx) => {
+        if (result.status === 'fulfilled') {
+          loaded.push(result.value);
+        } else {
+          const reason = result.reason;
+          const isNotFound =
+            reason?.status === 404 ||
+            String(reason).toLowerCase().includes('not found');
+
+          if (isNotFound) {
+            removeItem(ids[idx]);
+          } else {
+            console.error(
+              `[WishlistPage] Failed to fetch product ${ids[idx]}:`,
+              reason
+            );
+            hadNetworkError = true;
+          }
+        }
+      });
+
+      setProducts(loaded);
+      setFetchError(hadNetworkError && loaded.length === 0);
+      setIsInitialLoading(false);
+    },
+    [removeItem]
+  );
 
   /* ── On mount: sync with server then load product details ── */
   useEffect(() => {
@@ -130,14 +159,16 @@ export default function WishlistPage() {
       await loadProducts(latestIds);
     };
     init();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /* ── Handlers ── */
 
   const handleRemove = async (productId: string, productName: string) => {
     // Optimistically remove from UI
-    setProducts((prev) => prev.filter((p) => String(p.id) !== String(productId)));
+    setProducts((prev) =>
+      prev.filter((p) => String(p.id) !== String(productId))
+    );
     await removeItem(productId);
     toast.info(`${productName} favorilerden çıkarıldı.`);
   };
@@ -168,8 +199,8 @@ export default function WishlistPage() {
                   {isInitialLoading
                     ? 'Yükleniyor...'
                     : products.length === 0
-                    ? 'Henüz ürün eklenmedi'
-                    : `${products.length} kayıtlı ürün`}
+                      ? 'Henüz ürün eklenmedi'
+                      : `${products.length} kayıtlı ürün`}
                 </p>
               </div>
             </div>
@@ -190,7 +221,6 @@ export default function WishlistPage() {
 
       {/* ── Content ── */}
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-
         {/* Loading skeletons */}
         {isInitialLoading && (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -203,14 +233,18 @@ export default function WishlistPage() {
         {/* Fetch error */}
         {!isInitialLoading && fetchError && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-50 mb-4">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-50">
               <AlertCircle className="h-8 w-8 text-red-400" />
             </div>
-            <h2 className="text-lg font-extrabold text-slate-700 mb-2">Ürünler yüklenemedi</h2>
-            <p className="text-sm text-slate-400 mb-6">Bağlantınızı kontrol edip tekrar deneyin.</p>
+            <h2 className="mb-2 text-lg font-extrabold text-slate-700">
+              Ürünler yüklenemedi
+            </h2>
+            <p className="mb-6 text-sm text-slate-400">
+              Bağlantınızı kontrol edip tekrar deneyin.
+            </p>
             <button
               onClick={() => loadProducts(useWishlistStore.getState().items)}
-              className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-indigo-700 active:scale-95 transition-all"
+              className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white transition-all hover:bg-indigo-700 active:scale-95"
             >
               Tekrar Dene
             </button>
@@ -224,7 +258,7 @@ export default function WishlistPage() {
               <div className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-slate-100 to-slate-200">
                 <PackageSearch className="h-10 w-10 text-slate-300" />
               </div>
-              <div className="absolute -right-1 -top-1 flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-red-400 to-rose-500 shadow shadow-red-300/40">
+              <div className="absolute -top-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-red-400 to-rose-500 shadow shadow-red-300/40">
                 <Heart className="h-4 w-4 fill-white text-white" />
               </div>
             </div>
@@ -251,7 +285,8 @@ export default function WishlistPage() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {products.map((product) => {
               const isOutOfStock =
-                product.stockStatus === 'out_of_stock' || product.stockCount === 0;
+                product.stockStatus === 'out_of_stock' ||
+                product.stockCount === 0;
 
               return (
                 <div
@@ -263,7 +298,10 @@ export default function WishlistPage() {
                 >
                   {/* Discount badge — same circular badge as ProductCard */}
                   {product.originalPrice && (
-                    <DiscountBadge price={product.price} originalPrice={product.originalPrice} />
+                    <DiscountBadge
+                      price={product.price}
+                      originalPrice={product.originalPrice}
+                    />
                   )}
 
                   {/* Image Container */}
@@ -286,7 +324,7 @@ export default function WishlistPage() {
                       )}
 
                       {/* Remove from wishlist button (heart) */}
-                      <div className="absolute bottom-3 right-3 z-10">
+                      <div className="absolute right-3 bottom-3 z-10">
                         <button
                           id={`wishlist-remove-${product.id}`}
                           aria-label="Favorilerden çıkar"
@@ -316,17 +354,20 @@ export default function WishlistPage() {
                     {/* Name & Description */}
                     <div>
                       <Link href={`/product/${product.id}`}>
-                        <h3 className="text-sm font-extrabold uppercase tracking-tight text-slate-900 transition-colors group-hover:text-indigo-600 line-clamp-2">
+                        <h3 className="line-clamp-2 text-sm font-extrabold tracking-tight text-slate-900 uppercase transition-colors group-hover:text-indigo-600">
                           {product.name}
                         </h3>
                       </Link>
-                      <p className="mt-0.5 text-xs font-medium text-slate-400 line-clamp-1">
+                      <p className="mt-0.5 line-clamp-1 text-xs font-medium text-slate-400">
                         {product.description}
                       </p>
                     </div>
 
                     {/* Rating */}
-                    <RatingStars rating={product.rating} reviewCount={product.reviewCount} />
+                    <RatingStars
+                      rating={product.rating}
+                      reviewCount={product.reviewCount}
+                    />
 
                     {/* Price & Stock — same layout as ProductCard */}
                     <div className="mt-auto flex items-end justify-between pt-2">
@@ -336,17 +377,27 @@ export default function WishlistPage() {
                             isOutOfStock ? 'text-slate-400' : 'text-indigo-600'
                           }`}
                         >
-                          {product.price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                          {product.price.toLocaleString('tr-TR', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}{' '}
+                          TL
                         </span>
                         {product.originalPrice && (
                           <span className="text-sm font-semibold text-red-400 line-through">
-                            {product.originalPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                            {product.originalPrice.toLocaleString('tr-TR', {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}{' '}
+                            TL
                           </span>
                         )}
                       </div>
-                      <StockBadge status={product.stockStatus} count={product.stockCount} />
+                      <StockBadge
+                        status={product.stockStatus}
+                        count={product.stockCount}
+                      />
                     </div>
-
                   </div>
                 </div>
               );
