@@ -14,8 +14,8 @@ export default function Providers({ children }: { children: React.ReactNode }) {
           queries: {
             // Data will not be considered stale immediately (1 minute is standard practice)
             staleTime: 60 * 1000,
-            // Prevents over-fetching when the user switches tabs back and forth
-            refetchOnWindowFocus: false,
+            // Refetch stale queries when user returns to the tab so price/stock changes appear.
+            refetchOnWindowFocus: true,
           },
         },
       })
