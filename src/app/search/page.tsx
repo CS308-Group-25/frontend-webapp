@@ -152,15 +152,12 @@ function SearchContent() {
   );
   const [showSortMenu, setShowSortMenu] = useState(false);
 
-  // Client-side pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-
   const filterKey = `${query}|${sortBy}|${tagsParam}`;
-  const activePage = currentPage;
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filterKey]);
+  // Derived page state: tracks both current page and the filter key it was set for.
+  // When filterKey changes (new search/sort/tag), activePage resets to 1 without a setState.
+  const [pageState, setPageState] = useState({ page: 1, filterKey });
+  const activePage = pageState.filterKey === filterKey ? pageState.page : 1;
 
   // Fetch ALL products once for correct client-side filtering
   const { data, isLoading, isError } = useQuery({
@@ -364,7 +361,7 @@ function SearchContent() {
   );
 
   const handlePageChange = (page: number) => {
-    setCurrentPage(page);
+    setPageState({ page, filterKey });
     // Smooth scroll back to top of grid
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
