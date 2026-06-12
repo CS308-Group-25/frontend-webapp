@@ -8,7 +8,6 @@ import {
   createAdminProduct,
   deleteAdminProduct,
   fetchAdminProducts,
-  fetchProducts,
   fetchCategories,
   fetchAdminProductDetail,
   PaginatedProductResponse,
@@ -18,11 +17,18 @@ import {
 import { useAuthStore } from '@/features/auth';
 import ProductTable from '@/features/admin/products/components/ProductTable';
 import ProductModal from '@/features/admin/products/components/ProductModal';
+import DeleteProductModal from '@/features/admin/products/components/DeleteProductModal';
 import { fetchAdminCategories } from '@/features/admin/categories/api/categories.api';
 import Link from 'next/link';
 import { toast } from 'sonner';
 
-type SortOption = 'urgency' | 'name_asc' | 'stock_desc' | 'newest' | 'rating_asc' | 'rating_desc';
+type SortOption =
+  | 'urgency'
+  | 'name_asc'
+  | 'stock_desc'
+  | 'newest'
+  | 'rating_asc'
+  | 'rating_desc';
 type CategoryFieldObject = {
   id?: unknown;
   category_id?: unknown;
@@ -53,19 +59,47 @@ type ProductListingMetadata = {
   categories?: unknown;
   category_options?: unknown;
   categoryOptions?: unknown;
-  filters?: { categories?: unknown; category_options?: unknown; categoryOptions?: unknown };
-  filter_options?: { categories?: unknown; category_options?: unknown; categoryOptions?: unknown };
-  filterOptions?: { categories?: unknown; category_options?: unknown; categoryOptions?: unknown };
-  facets?: { categories?: unknown; category_options?: unknown; categoryOptions?: unknown };
+  filters?: {
+    categories?: unknown;
+    category_options?: unknown;
+    categoryOptions?: unknown;
+  };
+  filter_options?: {
+    categories?: unknown;
+    category_options?: unknown;
+    categoryOptions?: unknown;
+  };
+  filterOptions?: {
+    categories?: unknown;
+    category_options?: unknown;
+    categoryOptions?: unknown;
+  };
+  facets?: {
+    categories?: unknown;
+    category_options?: unknown;
+    categoryOptions?: unknown;
+  };
 };
 const CATALOG_CATEGORY_FALLBACKS: Record<string, CategoryOptionSet> = {
   'protein tozu': {
     brands: [],
-    subTypes: ['Whey Protein Tozu', 'Vegan Protein Tozu', 'Kazein Protein Tozu', 'İzolat Protein Tozu', 'Hidrolize Protein Tozu'],
+    subTypes: [
+      'Whey Protein Tozu',
+      'Vegan Protein Tozu',
+      'Kazein Protein Tozu',
+      'İzolat Protein Tozu',
+      'Hidrolize Protein Tozu',
+    ],
   },
   'spor gıdaları': {
     brands: [],
-    subTypes: ['Pre-Workout', 'Kreatin', 'Gainer', 'Enerji Jeli', 'Karbonhidrat Tozu'],
+    subTypes: [
+      'Pre-Workout',
+      'Kreatin',
+      'Gainer',
+      'Enerji Jeli',
+      'Karbonhidrat Tozu',
+    ],
   },
   vitamin: {
     brands: [],
@@ -75,13 +109,19 @@ const CATALOG_CATEGORY_FALLBACKS: Record<string, CategoryOptionSet> = {
     brands: [],
     subTypes: ['BCAA', 'Glutamin', 'L-Karnitin', 'EAA', 'Beta Alanin'],
   },
-  'sağlık': {
+  sağlık: {
     brands: [],
     subTypes: ['Probiyotik', 'Kolajen', 'Çinko', 'Magnezyum', 'Balık Yağı'],
   },
   'bar & atıştırmalık': {
     brands: [],
-    subTypes: ['Protein Bar', 'Enerji Bar', 'Granola Bar', 'Fıstık Ezmeli', 'Brownie'],
+    subTypes: [
+      'Protein Bar',
+      'Enerji Bar',
+      'Granola Bar',
+      'Fıstık Ezmeli',
+      'Brownie',
+    ],
   },
   aksesuar: {
     brands: [],
@@ -89,11 +129,19 @@ const CATALOG_CATEGORY_FALLBACKS: Record<string, CategoryOptionSet> = {
   },
 };
 
-function productToAdminPayload(product: Omit<Product, 'id'> | Product): AdminProductPayload {
+function productToAdminPayload(
+  product: Omit<Product, 'id'> | Product
+): AdminProductPayload {
   const stockValue = product.stockCount as unknown;
   const stock = Number(stockValue);
 
-  if (stockValue === '' || stockValue === undefined || stockValue === null || !Number.isFinite(stock) || stock < 0) {
+  if (
+    stockValue === '' ||
+    stockValue === undefined ||
+    stockValue === null ||
+    !Number.isFinite(stock) ||
+    stock < 0
+  ) {
     throw new Error('Stok sayısı zorunludur.');
   }
 
@@ -111,39 +159,68 @@ function productToAdminPayload(product: Omit<Product, 'id'> | Product): AdminPro
     serving_size: product.sizes?.[0]?.label || null,
     goal_tags: product.tags?.length ? product.tags.join(',') : null,
     category_id: product.categoryId ?? null,
-    images: product.images?.length ? product.images : (product.image ? [product.image] : null),
+    images: product.images?.length
+      ? product.images
+      : product.image
+        ? [product.image]
+        : null,
     tags_json: product.tags?.length ? product.tags : null,
     flavors_json: product.flavors?.length ? product.flavors : null,
     sizes_json: product.sizes?.length ? product.sizes : null,
     features: product.features?.length ? product.features : null,
     ingredients: product.ingredients || null,
-    nutrition_facts: product.nutritionFacts?.length ? product.nutritionFacts : null,
+    nutrition_facts: product.nutritionFacts?.length
+      ? product.nutritionFacts
+      : null,
     usage_info: product.usage || null,
   };
 }
 
 function getCategoryFieldNames(value: unknown): string[] {
   if (typeof value === 'string') {
-    return value.split(',').map((item) => item.trim()).filter(Boolean);
+    return value
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
   }
   if (!Array.isArray(value)) return [];
 
-  return value.flatMap((item: CategoryFieldItem) => {
+  return value
+    .flatMap((item: CategoryFieldItem) => {
       if (typeof item === 'string') {
-        return item.split(',').map((name) => name.trim()).filter(Boolean);
+        return item
+          .split(',')
+          .map((name) => name.trim())
+          .filter(Boolean);
       }
       if (!item || typeof item !== 'object') return '';
 
-      const name = item.name ?? item.title ?? item.label ?? item.value ?? item.brand ?? item.subcategory ?? item.sub_category;
+      const name =
+        item.name ??
+        item.title ??
+        item.label ??
+        item.value ??
+        item.brand ??
+        item.subcategory ??
+        item.sub_category;
       if (typeof name === 'string') return name;
-      if (name && typeof name === 'object' && 'name' in name && typeof name.name === 'string') return name.name;
+      if (
+        name &&
+        typeof name === 'object' &&
+        'name' in name &&
+        typeof name.name === 'string'
+      )
+        return name.name;
 
       return '';
     })
     .filter(Boolean);
 }
 
-function getNestedCategoryFieldNames(value: unknown, fields: Array<keyof CategoryFieldObject>): string[] {
+function getNestedCategoryFieldNames(
+  value: unknown,
+  fields: Array<keyof CategoryFieldObject>
+): string[] {
   if (!Array.isArray(value)) return [];
 
   return value.flatMap((item: CategoryFieldItem) => {
@@ -162,18 +239,20 @@ function getParentCategoryKeys(product: Product): string[] {
   const productSubType = normalizeCategoryName(product.subType);
   const keys = new Set<string>();
 
-  Object.entries(CATALOG_CATEGORY_FALLBACKS).forEach(([parentCategory, options]) => {
-    const subTypeNames = options.subTypes.map(normalizeCategoryName);
+  Object.entries(CATALOG_CATEGORY_FALLBACKS).forEach(
+    ([parentCategory, options]) => {
+      const subTypeNames = options.subTypes.map(normalizeCategoryName);
 
-    if (
-      productCategory === parentCategory ||
-      productSubType === parentCategory ||
-      subTypeNames.includes(productCategory) ||
-      subTypeNames.includes(productSubType)
-    ) {
-      keys.add(parentCategory);
+      if (
+        productCategory === parentCategory ||
+        productSubType === parentCategory ||
+        subTypeNames.includes(productCategory) ||
+        subTypeNames.includes(productSubType)
+      ) {
+        keys.add(parentCategory);
+      }
     }
-  });
+  );
 
   return Array.from(keys);
 }
@@ -187,7 +266,9 @@ function getFirstString(...values: unknown[]): string | undefined {
   return undefined;
 }
 
-function getCatalogCategoryEntries(productsData: ProductListingMetadata | undefined): CategoryFieldItem[] {
+function getCatalogCategoryEntries(
+  productsData: ProductListingMetadata | undefined
+): CategoryFieldItem[] {
   const categorySources = [
     productsData?.categories,
     productsData?.category_options,
@@ -206,20 +287,34 @@ function getCatalogCategoryEntries(productsData: ProductListingMetadata | undefi
     productsData?.facets?.categoryOptions,
   ];
 
-  return categorySources.find((source): source is CategoryFieldItem[] => Array.isArray(source)) ?? [];
+  return (
+    categorySources.find((source): source is CategoryFieldItem[] =>
+      Array.isArray(source)
+    ) ?? []
+  );
 }
 
 export default function AdminProductsPage() {
   const queryClient = useQueryClient();
   const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
-  const isAuthorized = isAuthenticated && (user?.role === 'product_manager' || user?.role === 'sales_manager');
+  const isAuthorized =
+    isAuthenticated &&
+    (user?.role === 'product_manager' || user?.role === 'sales_manager');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | undefined>();
   const [sortBy, setSortBy] = useState<SortOption>('urgency');
+  const [pendingDelete, setPendingDelete] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
-  const { data: productsData, isLoading, isError } = useQuery({
+  const {
+    data: productsData,
+    isLoading,
+    isError,
+  } = useQuery({
     queryKey: ['products', 'admin'],
-    queryFn: () => user?.role === 'sales_manager' ? fetchProducts(1000) : fetchAdminProducts(1000),
+    queryFn: () => fetchAdminProducts(1000),
     enabled: isAuthorized,
   });
   const { data: categories = [] } = useQuery({
@@ -252,7 +347,7 @@ export default function AdminProductsPage() {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       toast.success('Ürün güncellendi.');
       setIsModalOpen(false);
-    }, 
+    },
     onError: (error) => {
       toast.error(String(error));
     },
@@ -290,22 +385,27 @@ export default function AdminProductsPage() {
               subTypes: [],
             })
           : undefined,
-        ...parentCategoryNames.map((parentCategoryName) => (
-          optionsByName[parentCategoryName] ??= {
-            brands: [],
-            subTypes: [],
-          }
-        )),
+        ...parentCategoryNames.map(
+          (parentCategoryName) =>
+            (optionsByName[parentCategoryName] ??= {
+              brands: [],
+              subTypes: [],
+            })
+        ),
       ].filter((option): option is CategoryOptionSet => Boolean(option));
 
       if (targetOptions.length === 0) return;
 
       if (product.brand) {
-        targetOptions.forEach((option) => option.brands.push(product.brand as string));
+        targetOptions.forEach((option) =>
+          option.brands.push(product.brand as string)
+        );
       }
 
       if (product.subType) {
-        targetOptions.forEach((option) => option.subTypes.push(product.subType as string));
+        targetOptions.forEach((option) =>
+          option.subTypes.push(product.subType as string)
+        );
       }
     });
 
@@ -317,7 +417,7 @@ export default function AdminProductsPage() {
             brands: values.brands,
             subTypes: values.subTypes,
           },
-        ]),
+        ])
       ),
       optionsByName: Object.fromEntries(
         Object.entries(optionsByName).map(([categoryName, values]) => [
@@ -326,7 +426,7 @@ export default function AdminProductsPage() {
             brands: values.brands,
             subTypes: values.subTypes,
           },
-        ]),
+        ])
       ),
     };
   }, [products]);
@@ -334,13 +434,23 @@ export default function AdminProductsPage() {
     const optionsById: Record<number, CategoryOptionSet> = {};
     const optionsByName: Record<string, CategoryOptionSet> = {};
 
-    const catalogEntries = getCatalogCategoryEntries(productsData as ProductListingMetadata | undefined);
+    const catalogEntries = getCatalogCategoryEntries(
+      productsData as ProductListingMetadata | undefined
+    );
     for (const category of catalogEntries) {
       if (!category || typeof category !== 'object') continue;
 
-      const idValue = category.id ?? category.category_id ?? category.categoryId;
-      const categoryId = typeof idValue === 'number' ? idValue : Number(idValue);
-      const categoryName = getFirstString(category.name, category.title, category.label, category.value, category.category);
+      const idValue =
+        category.id ?? category.category_id ?? category.categoryId;
+      const categoryId =
+        typeof idValue === 'number' ? idValue : Number(idValue);
+      const categoryName = getFirstString(
+        category.name,
+        category.title,
+        category.label,
+        category.value,
+        category.category
+      );
       const options = {
         brands: [] as string[],
         subTypes: [] as string[],
@@ -351,10 +461,26 @@ export default function AdminProductsPage() {
           ...getCategoryFieldNames(category.brands),
           ...getCategoryFieldNames(category.brand_names),
           ...getCategoryFieldNames(category.brandNames),
-          ...getNestedCategoryFieldNames(category.subcategories, ['brands', 'brand_names', 'brandNames']),
-          ...getNestedCategoryFieldNames(category.sub_categories, ['brands', 'brand_names', 'brandNames']),
-          ...getNestedCategoryFieldNames(category.subCategories, ['brands', 'brand_names', 'brandNames']),
-          ...getNestedCategoryFieldNames(category.children, ['brands', 'brand_names', 'brandNames']),
+          ...getNestedCategoryFieldNames(category.subcategories, [
+            'brands',
+            'brand_names',
+            'brandNames',
+          ]),
+          ...getNestedCategoryFieldNames(category.sub_categories, [
+            'brands',
+            'brand_names',
+            'brandNames',
+          ]),
+          ...getNestedCategoryFieldNames(category.subCategories, [
+            'brands',
+            'brand_names',
+            'brandNames',
+          ]),
+          ...getNestedCategoryFieldNames(category.children, [
+            'brands',
+            'brand_names',
+            'brandNames',
+          ]),
         ],
         subTypes: [
           ...getCategoryFieldNames(category.subTypes),
@@ -370,7 +496,8 @@ export default function AdminProductsPage() {
         ],
       });
 
-      if (options.brands.length === 0 && options.subTypes.length === 0) continue;
+      if (options.brands.length === 0 && options.subTypes.length === 0)
+        continue;
       if (Number.isFinite(categoryId)) {
         optionsById[categoryId] = options;
       }
@@ -385,11 +512,18 @@ export default function AdminProductsPage() {
     () =>
       Object.fromEntries(
         categories.map((category) => {
-          const listingOptions = listingCategoryOptions.optionsById[category.id]
-            ?? listingCategoryOptions.optionsByName[normalizeCategoryName(category.name)];
-          const productOptions = productCategoryOptions.optionsById[category.id]
-            ?? productCategoryOptions.optionsByName[normalizeCategoryName(category.name)];
-          const catalogFallback = CATALOG_CATEGORY_FALLBACKS[normalizeCategoryName(category.name)];
+          const listingOptions =
+            listingCategoryOptions.optionsById[category.id] ??
+            listingCategoryOptions.optionsByName[
+              normalizeCategoryName(category.name)
+            ];
+          const productOptions =
+            productCategoryOptions.optionsById[category.id] ??
+            productCategoryOptions.optionsByName[
+              normalizeCategoryName(category.name)
+            ];
+          const catalogFallback =
+            CATALOG_CATEGORY_FALLBACKS[normalizeCategoryName(category.name)];
           const brands = [
             ...getCategoryFieldNames(category.brands),
             ...getCategoryFieldNames(category.brand_names),
@@ -422,29 +556,48 @@ export default function AdminProductsPage() {
               ],
             },
           ];
-        }),
+        })
       ),
-    [categories, listingCategoryOptions, productCategoryOptions],
+    [categories, listingCategoryOptions, productCategoryOptions]
   );
   const brandOptions = useMemo(
-    () => Array.from(new Set(products.flatMap((product) => (product.brand ? [product.brand] : [])))).sort(),
-    [products],
+    () =>
+      Array.from(
+        new Set(
+          products.flatMap((product) => (product.brand ? [product.brand] : []))
+        )
+      ).sort(),
+    [products]
   );
-  const isSaving = createProductMutation.isPending || updateProductMutation.isPending;
+  const isSaving =
+    createProductMutation.isPending || updateProductMutation.isPending;
 
   const handleSetPrice = (id: string, newPrice: number) => {
     queryClient.setQueryData<PaginatedProductResponse>(
       ['products', 'admin'],
-      (old) => old
-        ? { ...old, items: old.items.map((p) => p.id === id ? { ...p, price: newPrice } : p) }
-        : old
+      (old) =>
+        old
+          ? {
+              ...old,
+              items: old.items.map((p) =>
+                p.id === id ? { ...p, price: newPrice } : p
+              ),
+            }
+          : old
     );
   };
 
-  const handleDeleteProduct = async (id: string) => {
-    if (confirm('Bu ürünü silmek istediğinize emin misiniz?')) {
-      await deleteProductMutation.mutateAsync(id);
-    }
+  const handleDeleteProduct = (id: string) => {
+    const product = productsData?.items.find(
+      (p) => String(p.id) === String(id)
+    );
+    setPendingDelete({ id, name: product?.name ?? 'Ürün' });
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    await deleteProductMutation.mutateAsync(pendingDelete.id);
+    setPendingDelete(null);
   };
 
   const openAddModal = () => {
@@ -471,7 +624,8 @@ export default function AdminProductsPage() {
       case 'urgency': {
         const urgencyMap = { out_of_stock: 0, low_stock: 1, in_stock: 2 };
         return list.sort((a, b) => {
-          const urgencyDiff = urgencyMap[a.stockStatus] - urgencyMap[b.stockStatus];
+          const urgencyDiff =
+            urgencyMap[a.stockStatus] - urgencyMap[b.stockStatus];
           if (urgencyDiff !== 0) return urgencyDiff;
           // secondary sort by stock count if same urgency
           return (a.stockCount || 0) - (b.stockCount || 0);
@@ -486,7 +640,7 @@ export default function AdminProductsPage() {
       case 'rating_desc':
         return list.sort((a, b) => (b.rating || 0) - (a.rating || 0));
       case 'newest':
-        // list uses insertion order natively (we prepend new products). 
+        // list uses insertion order natively (we prepend new products).
         // We can just return it to respect literal newest-first.
         // For mock items, pushing 'isNew' items up inside existing order visually helps.
         return list.sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0));
@@ -510,16 +664,21 @@ export default function AdminProductsPage() {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
         <div className="flex flex-col items-center gap-4 text-center">
-          <div className="p-4 bg-red-50 rounded-2xl">
+          <div className="rounded-2xl bg-red-50 p-4">
             <ShieldX className="h-10 w-10 text-red-500" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-slate-900">Yetkisiz Erişim</h2>
+            <h2 className="text-xl font-bold text-slate-900">
+              Yetkisiz Erişim
+            </h2>
             <p className="mt-1 text-sm text-slate-500">
               Bu sayfaya erişim için yönetici yetkisi gereklidir.
             </p>
           </div>
-          <Link href="/" className="text-sm font-medium text-indigo-600 hover:underline">
+          <Link
+            href="/"
+            className="text-sm font-medium text-indigo-600 hover:underline"
+          >
             Ana sayfaya dön
           </Link>
         </div>
@@ -533,7 +692,9 @@ export default function AdminProductsPage() {
       <div className="mb-8 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
         <div>
           <div className="mb-2 text-sm text-slate-400">
-            <Link href="/" className="transition-colors hover:text-indigo-600">Ana Sayfa</Link>
+            <Link href="/" className="transition-colors hover:text-indigo-600">
+              Ana Sayfa
+            </Link>
             <span className="mx-2">•</span>
             <span className="font-bold text-slate-700">Yönetim Paketi</span>
           </div>
@@ -541,18 +702,19 @@ export default function AdminProductsPage() {
             Ürün Yönetimi
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Katalogdaki tüm ürünleri kolayca görüntüleyin, ekleyin ve düzenleyin.
+            Katalogdaki tüm ürünleri kolayca görüntüleyin, ekleyin ve
+            düzenleyin.
           </p>
         </div>
         <div className="flex w-full flex-col items-start gap-3 sm:w-auto sm:flex-row sm:items-center">
-          <div className="relative flex items-center w-full sm:w-auto">
+          <div className="relative flex w-full items-center sm:w-auto">
             <div className="absolute left-3 text-slate-400">
               <ArrowDownUp className="h-4 w-4" />
             </div>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as SortOption)}
-              className="w-full appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-10 text-sm font-semibold text-slate-700 shadow-sm outline-none transition-colors hover:border-indigo-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 sm:w-48"
+              className="w-full appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pr-10 pl-10 text-sm font-semibold text-slate-700 shadow-sm transition-colors outline-none hover:border-indigo-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 sm:w-48"
             >
               <option value="urgency">Stok Aciliyeti (Önerilen)</option>
               <option value="newest">En Yeni Eklenenler</option>
@@ -577,23 +739,36 @@ export default function AdminProductsPage() {
       {isLoading ? (
         <div className="flex min-h-[300px] flex-col items-center justify-center rounded-2xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
-          <p className="mt-3 text-sm font-medium text-slate-500">Ürünler yükleniyor...</p>
+          <p className="mt-3 text-sm font-medium text-slate-500">
+            Ürünler yükleniyor...
+          </p>
         </div>
       ) : isError ? (
         <div className="flex min-h-[300px] flex-col items-center justify-center rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-red-100">
           <p className="text-lg font-bold text-red-600">Ürünler yüklenemedi.</p>
-          <p className="mt-1 text-sm text-red-400">Backend bağlantısını kontrol edip tekrar deneyin.</p>
+          <p className="mt-1 text-sm text-red-400">
+            Backend bağlantısını kontrol edip tekrar deneyin.
+          </p>
         </div>
       ) : (
         <ProductTable
           products={sortedProducts}
           onEdit={user?.role === 'product_manager' ? openEditModal : undefined}
-          onDelete={user?.role === 'product_manager' ? handleDeleteProduct : undefined}
-          onSetPrice={user?.role === 'sales_manager' ? handleSetPrice : undefined}
+          onDelete={
+            user?.role === 'product_manager' ? handleDeleteProduct : undefined
+          }
+          onSetPrice={
+            user?.role === 'sales_manager' ? handleSetPrice : undefined
+          }
         />
       )}
 
       {/* Modal */}
+      <DeleteProductModal
+        productName={pendingDelete?.name ?? null}
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
       <ProductModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -605,7 +780,10 @@ export default function AdminProductsPage() {
         isSaving={isSaving}
         onSave={(data) => {
           if (editingProduct) {
-            updateProductMutation.mutate({ ...editingProduct, ...(data as Product) });
+            updateProductMutation.mutate({
+              ...editingProduct,
+              ...(data as Product),
+            });
           } else {
             createProductMutation.mutate(data as Omit<Product, 'id'>);
           }

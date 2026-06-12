@@ -17,18 +17,31 @@ const sortLabels: Record<SortOption, string> = {
   reviews: 'En Popüler',
 };
 
-const normalizeFilterValue = (value?: string) => value?.trim().toLocaleLowerCase('tr-TR') ?? '';
+const normalizeFilterValue = (value?: string) =>
+  value?.trim().toLocaleLowerCase('tr-TR') ?? '';
 
 const categoryFilterGroups = [
   {
     label: 'Protein Tozu',
     aliases: ['protein', 'protein tozu'],
-    subcategories: ['Whey Protein Tozu', 'Vegan Protein Tozu', 'Kazein Protein Tozu', 'İzolat Protein Tozu', 'Hidrolize Protein Tozu'],
+    subcategories: [
+      'Whey Protein Tozu',
+      'Vegan Protein Tozu',
+      'Kazein Protein Tozu',
+      'İzolat Protein Tozu',
+      'Hidrolize Protein Tozu',
+    ],
   },
   {
     label: 'Spor Gıdaları',
     aliases: ['spor', 'spor gıdaları'],
-    subcategories: ['Pre-Workout', 'Kreatin', 'Gainer', 'Enerji Jeli', 'Karbonhidrat Tozu'],
+    subcategories: [
+      'Pre-Workout',
+      'Kreatin',
+      'Gainer',
+      'Enerji Jeli',
+      'Karbonhidrat Tozu',
+    ],
   },
   {
     label: 'Vitamin',
@@ -43,12 +56,24 @@ const categoryFilterGroups = [
   {
     label: 'Sağlık',
     aliases: ['sağlık', 'saglik'],
-    subcategories: ['Probiyotik', 'Kolajen', 'Çinko', 'Magnezyum', 'Balık Yağı'],
+    subcategories: [
+      'Probiyotik',
+      'Kolajen',
+      'Çinko',
+      'Magnezyum',
+      'Balık Yağı',
+    ],
   },
   {
     label: 'Bar & Atıştırmalık',
     aliases: ['bar', 'atıştırmalık', 'bar & atıştırmalık'],
-    subcategories: ['Protein Bar', 'Enerji Bar', 'Granola Bar', 'Fıstık Ezmeli', 'Brownie'],
+    subcategories: [
+      'Protein Bar',
+      'Enerji Bar',
+      'Granola Bar',
+      'Fıstık Ezmeli',
+      'Brownie',
+    ],
   },
   {
     label: 'Aksesuar',
@@ -57,14 +82,22 @@ const categoryFilterGroups = [
   },
 ];
 
-const mainCategories = ['Protein Tozu', 'Spor Gıdaları', 'Vitamin', 'Amino Asit', 'Sağlık', 'Bar & Atıştırmalık', 'Aksesuar'];
+const mainCategories = [
+  'Protein Tozu',
+  'Spor Gıdaları',
+  'Vitamin',
+  'Amino Asit',
+  'Sağlık',
+  'Bar & Atıştırmalık',
+  'Aksesuar',
+];
 
 // Number of product cards shown per page
 const ITEMS_PER_PAGE = 24;
 
 function getFilterTags(
   query: string,
-  dynamicSubTypesByCategory: Record<string, string[]>,
+  dynamicSubTypesByCategory: Record<string, string[]>
 ): string[] {
   // No query → always show the static top-level category list
   if (!query.trim()) return mainCategories;
@@ -73,16 +106,24 @@ function getFilterTags(
 
   // Find the hardcoded group that matches the query (used for alias resolution & fallback)
   const matchedGroup = categoryFilterGroups.find((group) => {
-    const groupTerms = [group.label, ...group.aliases, ...group.subcategories].map(normalizeFilterValue);
+    const groupTerms = [
+      group.label,
+      ...group.aliases,
+      ...group.subcategories,
+    ].map(normalizeFilterValue);
     return groupTerms.some((term) => q.includes(term) || term.includes(q));
   });
 
   if (matchedGroup) {
     // Collect all dynamic subTypes stored under any alias/label key of this group
-    const allKeys = [matchedGroup.label, ...matchedGroup.aliases].map(normalizeFilterValue);
+    const allKeys = [matchedGroup.label, ...matchedGroup.aliases].map(
+      normalizeFilterValue
+    );
     const relevantSet = new Set<string>();
     allKeys.forEach((key) => {
-      (dynamicSubTypesByCategory[key] ?? []).forEach((st) => relevantSet.add(st));
+      (dynamicSubTypesByCategory[key] ?? []).forEach((st) =>
+        relevantSet.add(st)
+      );
     });
     const relevant = Array.from(relevantSet).sort();
     // Fall back to hardcoded list only if backend has nothing for this category
@@ -106,29 +147,17 @@ function SearchContent() {
   const sortBy = (searchParams.get('sort') || 'default') as SortOption;
   const tagsParam = searchParams.get('tags');
   const selectedTags = tagsParam ? tagsParam.split(',') : [];
-  const [showFiltersState, setShowFiltersState] = useState(() => selectedTags.length > 0);
+  const [showFiltersState, setShowFiltersState] = useState(
+    () => selectedTags.length > 0
+  );
   const [showSortMenu, setShowSortMenu] = useState(false);
 
-  // Client-side pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-
-  // Track the 'filter key' to detect when filters change (so page resets)
   const filterKey = `${query}|${sortBy}|${tagsParam}`;
-  const [lastFilterKey, setLastFilterKey] = useState(filterKey);
 
-  // Derive the safe page: reset to 1 when filters change
-  // We use a derived variable instead of useEffect to avoid cascading renders
-  const activePage = useMemo(() => {
-    if (filterKey !== lastFilterKey) return 1;
-    return currentPage;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterKey, currentPage]);
-
-  // Sync lastFilterKey as a side-effect (no setState cascade because we're updating a separate value)
-  if (filterKey !== lastFilterKey) {
-    setLastFilterKey(filterKey);
-    if (currentPage !== 1) setCurrentPage(1);
-  }
+  // Derived page state: tracks both current page and the filter key it was set for.
+  // When filterKey changes (new search/sort/tag), activePage resets to 1 without a setState.
+  const [pageState, setPageState] = useState({ page: 1, filterKey });
+  const activePage = pageState.filterKey === filterKey ? pageState.page : 1;
 
   // Fetch ALL products once for correct client-side filtering
   const { data, isLoading, isError } = useQuery({
@@ -151,7 +180,7 @@ function SearchContent() {
       }
     });
     return Object.fromEntries(
-      Object.entries(map).map(([k, v]) => [k, Array.from(v).sort()]),
+      Object.entries(map).map(([k, v]) => [k, Array.from(v).sort()])
     );
   }, [allProducts]);
 
@@ -169,7 +198,7 @@ function SearchContent() {
       }
     });
     return Object.fromEntries(
-      Object.entries(map).map(([k, v]) => [k, Array.from(v).sort()]),
+      Object.entries(map).map(([k, v]) => [k, Array.from(v).sort()])
     );
   }, [allProducts]);
 
@@ -180,16 +209,24 @@ function SearchContent() {
     if (!query.trim()) {
       // No query: show all brands
       const all = new Set<string>();
-      Object.values(dynamicBrandsByCategory).forEach((brands) => brands.forEach((b) => all.add(b)));
+      Object.values(dynamicBrandsByCategory).forEach((brands) =>
+        brands.forEach((b) => all.add(b))
+      );
       return Array.from(all).sort();
     }
     const q = normalizeFilterValue(query);
     const matchedGroup = categoryFilterGroups.find((group) => {
-      const groupTerms = [group.label, ...group.aliases, ...group.subcategories].map(normalizeFilterValue);
+      const groupTerms = [
+        group.label,
+        ...group.aliases,
+        ...group.subcategories,
+      ].map(normalizeFilterValue);
       return groupTerms.some((term) => q.includes(term) || term.includes(q));
     });
     if (matchedGroup) {
-      const allKeys = [matchedGroup.label, ...matchedGroup.aliases].map(normalizeFilterValue);
+      const allKeys = [matchedGroup.label, ...matchedGroup.aliases].map(
+        normalizeFilterValue
+      );
       const relevantSet = new Set<string>();
       allKeys.forEach((key) => {
         (dynamicBrandsByCategory[key] ?? []).forEach((b) => relevantSet.add(b));
@@ -199,14 +236,15 @@ function SearchContent() {
     }
     // Unknown query or no category match: show all brands
     const all = new Set<string>();
-    Object.values(dynamicBrandsByCategory).forEach((brands) => brands.forEach((b) => all.add(b)));
+    Object.values(dynamicBrandsByCategory).forEach((brands) =>
+      brands.forEach((b) => all.add(b))
+    );
     return Array.from(all).sort();
   }, [query, dynamicBrandsByCategory]);
 
   useEffect(() => {
     sessionStorage.setItem('lastSearchQuery', query);
   }, [query]);
-
 
   const updateFilters = (newSort: SortOption, newTags: string[]) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -259,31 +297,40 @@ function SearchContent() {
         normalizeFilterValue(p.description).includes(q) ||
         normalizeFilterValue(p.category).includes(q) ||
         normalizeFilterValue(p.subType).includes(q) ||
-        p.tags?.some((tag) => normalizeFilterValue(tag).includes(q)),
+        p.tags?.some((tag) => normalizeFilterValue(tag).includes(q))
     );
   }
 
   if (selectedTags.length > 0) {
     const allBrandsSet = new Set(
-      Object.values(dynamicBrandsByCategory).flatMap((brands) => brands.map(normalizeFilterValue)),
+      Object.values(dynamicBrandsByCategory).flatMap((brands) =>
+        brands.map(normalizeFilterValue)
+      )
     );
-    const selectedBrands = selectedTags.filter((tag) => allBrandsSet.has(normalizeFilterValue(tag)));
-    const selectedCategoryTags = selectedTags.filter((tag) => !allBrandsSet.has(normalizeFilterValue(tag)));
+    const selectedBrands = selectedTags.filter((tag) =>
+      allBrandsSet.has(normalizeFilterValue(tag))
+    );
+    const selectedCategoryTags = selectedTags.filter(
+      (tag) => !allBrandsSet.has(normalizeFilterValue(tag))
+    );
 
     filtered = filtered.filter((p) => {
-      const productFilterTags = [
-        p.category,
-        p.subType,
-        ...(p.tags ?? []),
-      ].map(normalizeFilterValue);
+      const productFilterTags = [p.category, p.subType, ...(p.tags ?? [])].map(
+        normalizeFilterValue
+      );
 
-      const matchesCategory = selectedCategoryTags.length === 0 ||
+      const matchesCategory =
+        selectedCategoryTags.length === 0 ||
         selectedCategoryTags.some((tag) =>
           productFilterTags.includes(normalizeFilterValue(tag))
         );
 
-      const matchesBrand = selectedBrands.length === 0 ||
-        selectedBrands.some((brand) => normalizeFilterValue(p.brand) === normalizeFilterValue(brand));
+      const matchesBrand =
+        selectedBrands.length === 0 ||
+        selectedBrands.some(
+          (brand) =>
+            normalizeFilterValue(p.brand) === normalizeFilterValue(brand)
+        );
 
       return matchesCategory && matchesBrand;
     });
@@ -308,10 +355,13 @@ function SearchContent() {
   const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
   const safePage = Math.min(activePage, totalPages || 1);
   const startIndex = (safePage - 1) * ITEMS_PER_PAGE;
-  const paginatedProducts = filtered.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  const paginatedProducts = filtered.slice(
+    startIndex,
+    startIndex + ITEMS_PER_PAGE
+  );
 
   const handlePageChange = (page: number) => {
-    setCurrentPage(page);
+    setPageState({ page, filterKey });
     // Smooth scroll back to top of grid
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -340,7 +390,9 @@ function SearchContent() {
     <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Page Header */}
       <div className="mb-6">
-        <h1 className={`font-extrabold tracking-tight text-slate-900 ${query ? 'text-lg sm:text-xl' : 'text-3xl sm:text-4xl'}`}>
+        <h1
+          className={`font-extrabold tracking-tight text-slate-900 ${query ? 'text-lg sm:text-xl' : 'text-3xl sm:text-4xl'}`}
+        >
           {query
             ? `"${query.charAt(0).toLocaleUpperCase('tr-TR') + query.slice(1)}" için sonuçlar`
             : 'Ürünleri Keşfet'}
@@ -366,10 +418,11 @@ function SearchContent() {
         <button
           id="filter-toggle"
           onClick={handleToggleFiltersPanel}
-          className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-all ${showFiltersState || selectedTags.length > 0
-            ? 'border-indigo-200 bg-indigo-50 text-indigo-600'
-            : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:text-indigo-600'
-            }`}
+          className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-all ${
+            showFiltersState || selectedTags.length > 0
+              ? 'border-indigo-200 bg-indigo-50 text-indigo-600'
+              : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:text-indigo-600'
+          }`}
         >
           <SlidersHorizontal className="h-4 w-4" />
           Filtreler
@@ -384,14 +437,22 @@ function SearchContent() {
         <div className="relative">
           <button
             onClick={() => setShowSortMenu(!showSortMenu)}
-            className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold shadow-[0_2px_8px_-4px_rgba(0,0,0,0.05)] transition-all focus:outline-none focus:ring-2 focus:ring-indigo-100 ${sortBy !== 'default' || showSortMenu
-              ? 'border-indigo-200 bg-indigo-50 text-indigo-600 hover:border-indigo-300'
-              : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:text-indigo-600 focus:border-indigo-500'
-              }`}
+            className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold shadow-[0_2px_8px_-4px_rgba(0,0,0,0.05)] transition-all focus:ring-2 focus:ring-indigo-100 focus:outline-none ${
+              sortBy !== 'default' || showSortMenu
+                ? 'border-indigo-200 bg-indigo-50 text-indigo-600 hover:border-indigo-300'
+                : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:text-indigo-600 focus:border-indigo-500'
+            }`}
           >
             {sortLabels[sortBy]}
-            <ChevronDown className={`h-4 w-4 transition-transform ${showSortMenu ? 'rotate-180 text-indigo-600' : (sortBy !== 'default' ? 'text-indigo-600' : 'text-slate-500')
-              }`} />
+            <ChevronDown
+              className={`h-4 w-4 transition-transform ${
+                showSortMenu
+                  ? 'rotate-180 text-indigo-600'
+                  : sortBy !== 'default'
+                    ? 'text-indigo-600'
+                    : 'text-slate-500'
+              }`}
+            />
           </button>
 
           {showSortMenu && (
@@ -401,15 +462,16 @@ function SearchContent() {
                 className="fixed inset-0 z-10"
                 onClick={() => setShowSortMenu(false)}
               />
-              <div className="absolute right-0 z-20 mt-2 w-56 origin-top-right overflow-hidden rounded-2xl border border-slate-200 bg-white py-1.5 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.08)] animate-in fade-in zoom-in-95 duration-200">
+              <div className="animate-in fade-in zoom-in-95 absolute right-0 z-20 mt-2 w-56 origin-top-right overflow-hidden rounded-2xl border border-slate-200 bg-white py-1.5 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.08)] duration-200">
                 {Object.entries(sortLabels).map(([value, label]) => (
                   <button
                     key={value}
                     onClick={() => handleSortChange(value as SortOption)}
-                    className={`block w-full px-4 py-2.5 text-left text-sm font-medium transition-colors ${sortBy === value
-                      ? 'bg-indigo-600 text-white font-bold shadow-md shadow-indigo-200'
-                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                      }`}
+                    className={`block w-full px-4 py-2.5 text-left text-sm font-medium transition-colors ${
+                      sortBy === value
+                        ? 'bg-indigo-600 font-bold text-white shadow-md shadow-indigo-200'
+                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                    }`}
                   >
                     {label}
                   </button>
@@ -422,7 +484,7 @@ function SearchContent() {
 
       {/* Filter Panel (collapsible) */}
       {(showFiltersState || selectedTags.length > 0) && (
-        <div className="mb-8 rounded-2xl border border-slate-100 bg-white p-6 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+        <div className="animate-in fade-in slide-in-from-top-2 mb-8 rounded-2xl border border-slate-100 bg-white p-6 shadow-sm duration-300">
           {/* Two-column layout: Kategoriler | Markalar */}
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             {/* Left column — Categories */}
@@ -433,7 +495,7 @@ function SearchContent() {
                 {selectedTags.length > 0 && (
                   <button
                     onClick={clearTags}
-                    className="flex sm:hidden items-center gap-1 text-xs font-semibold text-red-500 hover:text-red-600 transition-colors"
+                    className="flex items-center gap-1 text-xs font-semibold text-red-500 transition-colors hover:text-red-600 sm:hidden"
                   >
                     <X className="h-3 w-3" />
                     Temizle
@@ -447,10 +509,11 @@ function SearchContent() {
                     <button
                       key={tag}
                       onClick={() => handleToggleTag(tag)}
-                      className={`rounded-full border px-4 py-2 text-sm font-semibold transition-all active:scale-95 ${isActive
-                        ? 'border-indigo-400 bg-indigo-600 text-white shadow-md shadow-indigo-200'
-                        : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600'
-                        }`}
+                      className={`rounded-full border px-4 py-2 text-sm font-semibold transition-all active:scale-95 ${
+                        isActive
+                          ? 'border-indigo-400 bg-indigo-600 text-white shadow-md shadow-indigo-200'
+                          : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600'
+                      }`}
                     >
                       {tag}
                     </button>
@@ -467,7 +530,7 @@ function SearchContent() {
                 {selectedTags.length > 0 && (
                   <button
                     onClick={clearTags}
-                    className="hidden sm:flex items-center gap-1 text-xs font-semibold text-red-500 hover:text-red-600 transition-colors"
+                    className="hidden items-center gap-1 text-xs font-semibold text-red-500 transition-colors hover:text-red-600 sm:flex"
                   >
                     <X className="h-3 w-3" />
                     Temizle
@@ -484,10 +547,11 @@ function SearchContent() {
                     <button
                       key={brand}
                       onClick={() => handleToggleTag(brand)}
-                      className={`rounded-full border px-4 py-2 text-sm font-semibold transition-all active:scale-95 ${isActive
-                        ? 'border-violet-400 bg-violet-600 text-white shadow-md shadow-violet-200'
-                        : 'border-slate-200 bg-white text-slate-600 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-600'
-                        }`}
+                      className={`rounded-full border px-4 py-2 text-sm font-semibold transition-all active:scale-95 ${
+                        isActive
+                          ? 'border-violet-400 bg-violet-600 text-white shadow-md shadow-violet-200'
+                          : 'border-slate-200 bg-white text-slate-600 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-600'
+                      }`}
                     >
                       {brand}
                     </button>
@@ -501,21 +565,28 @@ function SearchContent() {
 
       {/* Product Grid or Loading States */}
       {isLoading ? (
-        <div className="flex items-center justify-center min-h-[40vh]">
+        <div className="flex min-h-[40vh] items-center justify-center">
           <div className="flex flex-col items-center gap-4 text-slate-500">
             <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-            <p className="font-medium animate-pulse">Ürünler Yükleniyor...</p>
+            <p className="animate-pulse font-medium">Ürünler Yükleniyor...</p>
           </div>
         </div>
       ) : isError ? (
         <div className="flex min-h-[40vh] flex-col items-center justify-center text-center">
           <p className="text-xl font-bold text-slate-900">Bir Hata Oluştu</p>
-          <p className="text-slate-500">Ürünleri çekerken sunucu bağlantısı başarısız oldu.</p>
+          <p className="text-slate-500">
+            Ürünleri çekerken sunucu bağlantısı başarısız oldu.
+          </p>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="flex min-h-[40vh] items-center justify-center flex-col text-center">
-          <p className="text-2xl font-bold text-slate-900 mb-2">Ürün Bulunamadı</p>
-          <p className="text-slate-500 max-w-sm">Bu filtrelere uygun bir ürün stoklarımızda kalmamış olabilir. Aramanızı genişletmeyi deneyin!</p>
+        <div className="flex min-h-[40vh] flex-col items-center justify-center text-center">
+          <p className="mb-2 text-2xl font-bold text-slate-900">
+            Ürün Bulunamadı
+          </p>
+          <p className="max-w-sm text-slate-500">
+            Bu filtrelere uygun bir ürün stoklarımızda kalmamış olabilir.
+            Aramanızı genişletmeyi deneyin!
+          </p>
         </div>
       ) : (
         <>
@@ -526,8 +597,11 @@ function SearchContent() {
             <div className="mt-12 flex flex-col items-center gap-4">
               {/* Info text */}
               <p className="text-sm text-slate-500">
-                <span className="font-semibold text-slate-700">{startIndex + 1}–{Math.min(startIndex + ITEMS_PER_PAGE, filtered.length)}</span>
-                {' '}/ {filtered.length} ürün gösteriliyor
+                <span className="font-semibold text-slate-700">
+                  {startIndex + 1}–
+                  {Math.min(startIndex + ITEMS_PER_PAGE, filtered.length)}
+                </span>{' '}
+                / {filtered.length} ürün gösteriliyor
               </p>
 
               {/* Page Buttons */}
@@ -545,17 +619,21 @@ function SearchContent() {
                 {/* Page numbers */}
                 {getPageNumbers().map((page, idx) =>
                   page === '...' ? (
-                    <span key={`ellipsis-${idx}`} className="flex h-10 w-10 items-center justify-center text-sm text-slate-400">
+                    <span
+                      key={`ellipsis-${idx}`}
+                      className="flex h-10 w-10 items-center justify-center text-sm text-slate-400"
+                    >
                       ···
                     </span>
                   ) : (
                     <button
                       key={page}
                       onClick={() => handlePageChange(page as number)}
-                      className={`flex h-10 w-10 items-center justify-center rounded-xl border text-sm font-semibold transition-all ${safePage === page
-                        ? 'border-indigo-600 bg-indigo-600 text-white shadow-md shadow-indigo-200'
-                        : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-300 hover:text-indigo-600'
-                        }`}
+                      className={`flex h-10 w-10 items-center justify-center rounded-xl border text-sm font-semibold transition-all ${
+                        safePage === page
+                          ? 'border-indigo-600 bg-indigo-600 text-white shadow-md shadow-indigo-200'
+                          : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-300 hover:text-indigo-600'
+                      }`}
                     >
                       {page}
                     </button>
@@ -584,8 +662,8 @@ export default function SearchPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+        <div className="flex min-h-[60vh] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
         </div>
       }
     >
