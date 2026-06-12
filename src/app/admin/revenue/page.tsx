@@ -1,17 +1,90 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+import { format } from 'date-fns';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  LabelList,
+} from 'recharts';
 import {
   CalendarDays,
   LineChart,
   RefreshCw,
   ShieldX,
   TrendingUp,
-  Banknote
+  Banknote,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import apiClient from '@/lib/api-client';
 import { useAuthStore } from '@/features/auth';
+
+const years = Array.from({ length: 15 }, (_, i) => 2026 + i);
+const months = [
+  "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
+  "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"
+];
+
+const renderDatePickerHeader = ({
+  date,
+  changeYear,
+  changeMonth,
+  decreaseMonth,
+  increaseMonth,
+  prevMonthButtonDisabled,
+  nextMonthButtonDisabled,
+}: {
+  date: Date;
+  changeYear: (year: number) => void;
+  changeMonth: (month: number) => void;
+  decreaseMonth: () => void;
+  increaseMonth: () => void;
+  prevMonthButtonDisabled: boolean;
+  nextMonthButtonDisabled: boolean;
+}) => (
+  <div className="flex items-center justify-between px-2 py-2">
+    <button type="button" onClick={decreaseMonth} disabled={prevMonthButtonDisabled} className="p-1 rounded-full hover:bg-slate-100 disabled:opacity-50 transition-colors">
+      <ChevronLeft className="h-5 w-5 text-slate-600" />
+    </button>
+    <div className="flex gap-2">
+      <select
+        value={months[date.getMonth()]}
+        onChange={({ target: { value } }) => changeMonth(months.indexOf(value))}
+        className="rounded-md border border-slate-200 bg-white px-2 py-1 text-sm font-semibold text-slate-700 outline-none cursor-pointer hover:bg-slate-50 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+      >
+        {months.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+      <select
+        value={date.getFullYear()}
+        onChange={({ target: { value } }) => changeYear(Number(value))}
+        className="rounded-md border border-slate-200 bg-white px-2 py-1 text-sm font-semibold text-slate-700 outline-none cursor-pointer hover:bg-slate-50 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+      >
+        {years.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </div>
+    <button type="button" onClick={increaseMonth} disabled={nextMonthButtonDisabled} className="p-1 rounded-full hover:bg-slate-100 disabled:opacity-50 transition-colors">
+      <ChevronRight className="h-5 w-5 text-slate-600" />
+    </button>
+  </div>
+);
 
 export interface RevenueDataPoint {
   date: string;
@@ -27,7 +100,7 @@ export interface RevenueReportResponse {
 }
 
 const fetchRevenueReport = async (from: string, to: string) => {
-  const safeFrom = from || '2000-01-01';
+  const safeFrom = from || '2026-01-01';
   const safeTo = to || new Date().toISOString().split('T')[0];
   return apiClient.get<RevenueReportResponse>('/v1/admin/reports/revenue', {
     params: {
@@ -41,13 +114,44 @@ export default function AdminRevenuePage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
   
   // Set default dates inside useState to avoid impure function calls during render
-  const [fromDate, setFromDate] = useState(() => new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+  const [fromDate, setFromDate] = useState('2026-01-01');
   const [toDate, setToDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [appliedFromDate, setAppliedFromDate] = useState(() => new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+  const [appliedFromDate, setAppliedFromDate] = useState('2026-01-01');
   const [appliedToDate, setAppliedToDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [reportData, setReportData] = useState<RevenueReportResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
+
+  const chartData = useMemo(() => {
+    if (!reportData?.chart_data) return [];
+    
+    const sortedData = [...reportData.chart_data].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    if (sortedData.length === 0) return [];
+
+    if (sortedData.length > 60) {
+      const monthlyMap = new Map<string, { date: string, revenue: number, profit: number }>();
+      sortedData.forEach(day => {
+        const d = new Date(day.date);
+        const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+        if (!monthlyMap.has(monthKey)) {
+          monthlyMap.set(monthKey, { date: monthKey, revenue: 0, profit: 0 });
+        }
+        const m = monthlyMap.get(monthKey)!;
+        m.revenue += Number(day.revenue);
+        m.profit += Number(day.profit);
+      });
+      
+      return Array.from(monthlyMap.values()).map(month => ({
+        ...month,
+        formattedDate: new Date(month.date).toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })
+      }));
+    }
+
+    return sortedData.map((day) => ({
+      ...day,
+      formattedDate: new Date(day.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' }),
+    }));
+  }, [reportData]);
 
   // Only Sales Manager is authorized for revenue report
   const isAuthorized = isAuthenticated && user?.role === 'sales_manager';
@@ -98,15 +202,20 @@ export default function AdminRevenuePage() {
   };
 
   const clearFilters = () => {
-    setFromDate('');
-    setToDate('');
-    if (appliedFromDate === '' && appliedToDate === '') {
+    const defaultFrom = '2026-01-01';
+    const defaultTo = new Date().toISOString().split('T')[0];
+    
+    setFromDate(defaultFrom);
+    setToDate(defaultTo);
+    
+    if (appliedFromDate === defaultFrom && appliedToDate === defaultTo) {
       return; // Already cleared, prevent infinite loading state
     }
+    
     setLoading(true);
     setFetchError(false);
-    setAppliedFromDate('');
-    setAppliedToDate('');
+    setAppliedFromDate(defaultFrom);
+    setAppliedToDate(defaultTo);
   };
 
   const rangeLabel = (() => {
@@ -200,26 +309,40 @@ export default function AdminRevenuePage() {
             <label className="flex flex-col gap-1.5 text-sm font-semibold text-slate-700">
               Başlangıç Tarihi
               <div className="relative">
-                <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="date"
-                  value={fromDate}
-                  max={toDate || undefined}
-                  onChange={(event) => setFromDate(event.target.value)}
+                <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 z-10" />
+                <DatePicker
+                  selected={fromDate ? new Date(fromDate) : null}
+                  onChange={(date: Date | null) => {
+                    if (date) {
+                      const formatted = format(date, 'yyyy-MM-dd');
+                      setFromDate(formatted);
+                      if (toDate && formatted > toDate) {
+                        setToDate(formatted);
+                      }
+                    } else {
+                      setFromDate('');
+                    }
+                  }}
+                  minDate={new Date('2026-01-01')}
+                  dateFormat="dd.MM.yyyy"
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-sm font-medium text-slate-700 outline-none transition-colors focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+                  wrapperClassName="w-full"
+                  renderCustomHeader={renderDatePickerHeader}
                 />
               </div>
             </label>
             <label className="flex flex-col gap-1.5 text-sm font-semibold text-slate-700">
               Bitiş Tarihi
               <div className="relative">
-                <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="date"
-                  value={toDate}
-                  min={fromDate || undefined}
-                  onChange={(event) => setToDate(event.target.value)}
+                <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 z-10" />
+                <DatePicker
+                  selected={toDate ? new Date(toDate) : null}
+                  onChange={(date: Date | null) => setToDate(date ? format(date, 'yyyy-MM-dd') : '')}
+                  minDate={fromDate ? new Date(Math.max(new Date(fromDate).getTime(), new Date('2026-01-01').getTime())) : new Date('2026-01-01')}
+                  dateFormat="dd.MM.yyyy"
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-sm font-medium text-slate-700 outline-none transition-colors focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+                  wrapperClassName="w-full"
+                  renderCustomHeader={renderDatePickerHeader}
                 />
               </div>
             </label>
@@ -310,49 +433,87 @@ export default function AdminRevenuePage() {
             </div>
           </div>
 
-          {/* Daily Table */}
-          <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
-            <div className="border-b border-slate-100 bg-slate-50/50 px-6 py-4">
-              <h3 className="text-sm font-bold text-slate-800">Günlük Gelir Özeti</h3>
-            </div>
-            {reportData.chart_data.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-slate-600">
-                  <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-                    <tr>
-                      <th className="px-6 py-4 font-bold">Tarih</th>
-                      <th className="px-6 py-4 font-bold text-right">Gelir</th>
-                      <th className="px-6 py-4 font-bold text-right">Kar</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {reportData.chart_data.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((day) => (
-                      <tr key={day.date} className="transition-colors hover:bg-slate-50/50">
-                        <td className="px-6 py-4 font-semibold text-slate-900">
-                          {new Date(day.date).toLocaleDateString('tr-TR', {
-                            day: 'numeric',
-                            month: 'long',
-                            year: 'numeric'
-                          })}
-                        </td>
-                        <td className="px-6 py-4 text-right font-medium text-slate-600">
-                          {Number(day.revenue).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
-                        </td>
-                        <td className="px-6 py-4 text-right font-black text-slate-900">
-                          {Number(day.profit).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          {/* Chart Section */}
+          <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+            <h3 className="mb-6 text-lg font-bold text-slate-800">Gelir ve Kar Grafiği</h3>
+            {chartData.length > 0 ? (
+              <div className="h-[400px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={chartData}
+                      margin={{ top: 30, right: 30, left: 20, bottom: 5 }}
+                      barGap={2}
+                      barCategoryGap="15%"
+                    >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                    <XAxis 
+                      dataKey="formattedDate" 
+                      stroke="#94a3b8" 
+                      fontSize={12} 
+                      tickLine={false} 
+                      axisLine={false} 
+                      dy={10}
+                      minTickGap={30}
+                      interval="equidistantPreserveStart"
+                    />
+                    <YAxis 
+                      stroke="#94a3b8" 
+                      fontSize={12} 
+                      tickLine={false} 
+                      axisLine={false} 
+                      tickFormatter={(value: number | string) => `${Number(value) >= 1000 ? (Number(value) / 1000).toFixed(0) + 'k' : value}`}
+                      dx={-10}
+                    />
+                    <Tooltip 
+                      contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)' }}
+                      formatter={(value: any, name: any) => [`${Number(value || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL`, name]} // eslint-disable-line @typescript-eslint/no-explicit-any
+                      cursor={{ fill: '#f8fafc' }}
+                    />
+                    <Legend wrapperStyle={{ paddingTop: '20px' }} iconType="circle" />
+                    <Bar 
+                      dataKey="revenue" 
+                      name="Gelir" 
+                      fill="#16a34a" 
+                      radius={[4, 4, 0, 0]}
+                    >
+                      <LabelList 
+                        dataKey="revenue" 
+                        position="top" 
+                        formatter={(value: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+                          if (value === null || value === undefined) return '';
+                          return Number(value) >= 1000 ? `${(Number(value) / 1000).toFixed(0)}k` : value;
+                        }}
+                        style={{ fill: '#16a34a', fontSize: 11, fontWeight: 700 }}
+                      />
+                    </Bar>
+                    <Bar 
+                      dataKey="profit" 
+                      name="Kar" 
+                      fill="#4f46e5" 
+                      radius={[4, 4, 0, 0]}
+                    >
+                      <LabelList 
+                        dataKey="profit" 
+                        position="top" 
+                        formatter={(value: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+                          if (value === null || value === undefined) return '';
+                          return Number(value) >= 1000 ? `${(Number(value) / 1000).toFixed(0)}k` : value;
+                        }}
+                        style={{ fill: '#4f46e5', fontSize: 11, fontWeight: 700 }}
+                      />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="flex h-[400px] flex-col items-center justify-center rounded-xl bg-slate-50 text-center">
                 <LineChart className="mb-3 h-10 w-10 text-slate-300" />
-                <p className="text-sm font-medium text-slate-500">Bu tarih aralığında veri bulunmuyor.</p>
+                <p className="text-sm font-medium text-slate-500">Görüntülenecek grafik verisi bulunamadı.</p>
               </div>
             )}
           </div>
+
+
         </div>
       ) : null}
     </div>
