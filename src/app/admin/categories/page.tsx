@@ -3,20 +3,75 @@
 import { useState, useMemo } from 'react';
 import { FolderPlus, ArrowDownUp, Search, Tag, Layers, Package, X, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
-import { mockCategories } from '@/features/admin/categories/data/mock-categories';
 import type { Category, CategoryFormData, CategorySortOption } from '@/features/admin/categories/types/category.types';
 import CategoryTable from '@/features/admin/categories/components/CategoryTable';
 import CategoryModal from '@/features/admin/categories/components/CategoryModal';
 import DeleteConfirmModal from '@/features/admin/categories/components/DeleteConfirmModal';
+import { fetchAdminCategories, createCategory, updateCategory, deleteCategory } from '@/features/admin/categories/api/categories.api';
+
+import { fetchCategories } from '@/features/products/api/products.api';
 
 export default function AdminCategoriesPage() {
-  const [categories, setCategories] = useState<Category[]>(mockCategories);
+  const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | undefined>();
   const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
   const [sortBy, setSortBy] = useState<CategorySortOption>('name_asc');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // ─── Data Fetching ─────────────────────────────────────────────────────────
+
+  const { data: rawCategories = [] } = useQuery({
+    queryKey: ['admin-categories'],
+    queryFn: fetchAdminCategories,
+  });
+
+  const { data: mainCategories = [] } = useQuery({
+    queryKey: ['categories'],
+    queryFn: fetchCategories,
+  });
+
+  // Ensure default values for missing fields to keep UI stable
+  const categories: Category[] = useMemo(() => {
+    return rawCategories.map((c, i) => ({
+      ...c,
+      id: c.id || i + 1,
+      productCount: c.productCount || 0,
+      createdAt: c.createdAt || new Date().toISOString(),
+    }));
+  }, [rawCategories]);
+
+  // ─── Mutations ─────────────────────────────────────────────────────────────
+
+  const createMutation = useMutation({
+    mutationFn: createCategory,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
+      setIsModalOpen(false);
+      setEditingCategory(undefined);
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: CategoryFormData }) => updateCategory({ id, data }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      setIsModalOpen(false);
+      setEditingCategory(undefined);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: ({ id }: { id: number }) => deleteCategory({ id }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      setDeletingCategory(null);
+    },
+  });
 
   // ─── Handlers ──────────────────────────────────────────────────────────────
 
@@ -32,22 +87,10 @@ export default function AdminCategoriesPage() {
 
   const handleSave = (data: CategoryFormData) => {
     if (editingCategory) {
-      setCategories((prev) =>
-        prev.map((c) =>
-          c.id === editingCategory.id ? { ...c, ...data } : c,
-        ),
-      );
+      updateMutation.mutate({ id: editingCategory.id, data });
     } else {
-      const newCategory: Category = {
-        ...data,
-        id: `cat-${Date.now()}`,
-        productCount: 0,
-        createdAt: new Date().toISOString(),
-      };
-      setCategories((prev) => [newCategory, ...prev]);
+      createMutation.mutate(data);
     }
-    setIsModalOpen(false);
-    setEditingCategory(undefined);
   };
 
   const handleDeleteRequest = (category: Category) => {
@@ -56,10 +99,8 @@ export default function AdminCategoriesPage() {
 
   const handleDeleteConfirm = () => {
     if (!deletingCategory) return;
-    setCategories((prev) => prev.filter((c) => c.id !== deletingCategory.id));
-    setDeletingCategory(null);
+    deleteMutation.mutate({ id: deletingCategory.id });
   };
-
   // ─── Derived: filtered + sorted ────────────────────────────────────────────
 
   const processedCategories = useMemo(() => {
@@ -81,19 +122,19 @@ export default function AdminCategoriesPage() {
         sorted.sort((a, b) => b.name.localeCompare(a.name, 'tr'));
         break;
       case 'most_products':
-        sorted.sort((a, b) => b.productCount - a.productCount);
+        sorted.sort((a, b) => (b.productCount || 0) - (a.productCount || 0));
         break;
       case 'least_products':
-        sorted.sort((a, b) => a.productCount - b.productCount);
+        sorted.sort((a, b) => (a.productCount || 0) - (b.productCount || 0));
         break;
     }
     return sorted;
   }, [categories, searchQuery, sortBy]);
 
-  const existingNames = useMemo(() => categories.map((c) => c.name), [categories]);
+
 
   const totalProducts = useMemo(
-    () => categories.reduce((sum, c) => sum + c.productCount, 0),
+    () => categories.reduce((sum, c) => sum + (c.productCount || 0), 0),
     [categories],
   );
 
@@ -119,14 +160,14 @@ export default function AdminCategoriesPage() {
 
       {/* Header */}
       <div className="mb-8 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
-            Kategori Yönetimi
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Ürün kategorilerini görüntüleyin, ekleyin ve yönetin.
-          </p>
-        </div>
+        <div className="mb-8 max-w-2xl">
+        <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
+          Alt Kategoriler
+        </h1>
+        <p className="mt-3 text-lg text-slate-600">
+          Mağazanızdaki ürün alt kategorilerini buradan detaylı olarak inceleyebilir, düzenleyebilir veya kaldırabilirsiniz.
+        </p>
+      </div>
 
         <button
           onClick={openAddModal}
@@ -250,13 +291,11 @@ export default function AdminCategoriesPage() {
       {/* Add / Edit modal */}
       <CategoryModal
         isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setEditingCategory(undefined);
-        }}
+        onClose={() => setIsModalOpen(false)}
         onSave={handleSave}
         initialData={editingCategory}
-        existingNames={existingNames}
+        existingNames={categories.map((c) => c.name)}
+        mainCategories={mainCategories}
       />
 
       {/* Delete confirmation modal */}

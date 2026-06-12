@@ -24,7 +24,6 @@ export default function ProductTable({ products, onEdit, onDelete }: ProductTabl
           <thead className="bg-slate-50 text-slate-600">
             <tr>
               <th className="px-6 py-4 font-bold">Ürün</th>
-              <th className="px-6 py-4 font-bold">Fiyat</th>
               <th className="px-6 py-4 font-bold">Kategori</th>
               <th className="px-6 py-4 font-bold">Değerlendirme</th>
               <th className="px-6 py-4 font-bold">Stok Durumu</th>
@@ -56,9 +55,6 @@ export default function ProductTable({ products, onEdit, onDelete }: ProductTabl
                       <div className="font-bold text-slate-900">{product.name}</div>
                     </div>
                   </div>
-                </td>
-                <td className="px-6 py-4 font-semibold text-slate-700">
-                  {product.price.toLocaleString('tr-TR')} TL
                 </td>
                 <td className="px-6 py-4 text-slate-600">
                   {product.category || 'Belirtilmemiş'}

@@ -36,6 +36,7 @@ export interface Product {
 
   isNew?: boolean;
   category?: string;
+  categoryId?: number;
   brand?: string;          // Extracted brand from backend
   model?: string;
   serialNumber?: string;

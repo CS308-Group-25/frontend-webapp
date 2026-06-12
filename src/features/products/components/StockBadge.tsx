@@ -9,8 +9,8 @@ export default function StockBadge({ status, count }: StockBadgeProps) {
   // Guard against negative stock values from the backend
   const safeCount = typeof count === 'number' ? Math.max(count, 0) : count;
 
-  // Dynamically treat as low stock if safeCount is 5 or below, unless it's naturally out of stock.
-  const isActuallyLowStock = status === 'low_stock' || (status === 'in_stock' && typeof safeCount === 'number' && safeCount > 0 && safeCount <= 5);
+  // Dynamically treat as low stock when stock is below the backend seed threshold.
+  const isActuallyLowStock = status === 'low_stock' || (status === 'in_stock' && typeof safeCount === 'number' && safeCount > 0 && safeCount < 15);
 
   if (status === 'out_of_stock' || safeCount === 0) {
     return (

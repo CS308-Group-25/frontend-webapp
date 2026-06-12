@@ -62,14 +62,35 @@ const mainCategories = ['Protein Tozu', 'Spor Gıdaları', 'Vitamin', 'Amino Asi
 // Number of product cards shown per page
 const ITEMS_PER_PAGE = 24;
 
-function getFilterTags(query: string): string[] {
+function getFilterTags(
+  query: string,
+  dynamicSubTypesByCategory: Record<string, string[]>,
+): string[] {
+  // No query → always show the static top-level category list
   if (!query.trim()) return mainCategories;
+
   const q = normalizeFilterValue(query);
+
+  // Find the hardcoded group that matches the query (used for alias resolution & fallback)
   const matchedGroup = categoryFilterGroups.find((group) => {
     const groupTerms = [group.label, ...group.aliases, ...group.subcategories].map(normalizeFilterValue);
     return groupTerms.some((term) => q.includes(term) || term.includes(q));
   });
-  return matchedGroup ? matchedGroup.subcategories : mainCategories;
+
+  if (matchedGroup) {
+    // Collect all dynamic subTypes stored under any alias/label key of this group
+    const allKeys = [matchedGroup.label, ...matchedGroup.aliases].map(normalizeFilterValue);
+    const relevantSet = new Set<string>();
+    allKeys.forEach((key) => {
+      (dynamicSubTypesByCategory[key] ?? []).forEach((st) => relevantSet.add(st));
+    });
+    const relevant = Array.from(relevantSet).sort();
+    // Fall back to hardcoded list only if backend has nothing for this category
+    return relevant.length > 0 ? relevant : matchedGroup.subcategories;
+  }
+
+  // Query doesn't match any known group → show static main categories
+  return mainCategories;
 }
 
 /* ══════════════════════════════════════════════════════════════════ */
@@ -118,18 +139,74 @@ function SearchContent() {
   // Extract products array from API format, fallback to empty array.
   const allProducts = useMemo(() => data?.items ?? [], [data?.items]);
 
-  // Dynamically extract unique brands from fetched products.
-  const dynamicBrands = useMemo(() => {
-    const brands = new Set<string>();
+  // Build a category-name → brands[] map from real product data.
+  const dynamicBrandsByCategory = useMemo(() => {
+    const map: Record<string, Set<string>> = {};
     allProducts.forEach((p) => {
-      if (p.brand) brands.add(p.brand);
+      if (!p.brand) return;
+      const catKey = normalizeFilterValue(p.category);
+      if (catKey) {
+        if (!map[catKey]) map[catKey] = new Set();
+        map[catKey].add(p.brand);
+      }
     });
-    return Array.from(brands).sort();
+    return Object.fromEntries(
+      Object.entries(map).map(([k, v]) => [k, Array.from(v).sort()]),
+    );
   }, [allProducts]);
+
+  // Build a category-name → subTypes[] map from real product data.
+  // This lets getFilterTags find ALL subTypes for a category, including newly added ones.
+  const dynamicSubTypesByCategory = useMemo(() => {
+    const map: Record<string, Set<string>> = {};
+    allProducts.forEach((p) => {
+      if (!p.subType) return;
+      // Index by the product's own category name (normalised)
+      const catKey = normalizeFilterValue(p.category);
+      if (catKey) {
+        if (!map[catKey]) map[catKey] = new Set();
+        map[catKey].add(p.subType);
+      }
+    });
+    return Object.fromEntries(
+      Object.entries(map).map(([k, v]) => [k, Array.from(v).sort()]),
+    );
+  }, [allProducts]);
+
+  // Compute which brands to show in the filter panel based on the current query.
+  // When a category group is matched, only show brands of products in that category.
+  // Falls back to ALL brands when there is no specific category query.
+  const visibleBrands = useMemo(() => {
+    if (!query.trim()) {
+      // No query: show all brands
+      const all = new Set<string>();
+      Object.values(dynamicBrandsByCategory).forEach((brands) => brands.forEach((b) => all.add(b)));
+      return Array.from(all).sort();
+    }
+    const q = normalizeFilterValue(query);
+    const matchedGroup = categoryFilterGroups.find((group) => {
+      const groupTerms = [group.label, ...group.aliases, ...group.subcategories].map(normalizeFilterValue);
+      return groupTerms.some((term) => q.includes(term) || term.includes(q));
+    });
+    if (matchedGroup) {
+      const allKeys = [matchedGroup.label, ...matchedGroup.aliases].map(normalizeFilterValue);
+      const relevantSet = new Set<string>();
+      allKeys.forEach((key) => {
+        (dynamicBrandsByCategory[key] ?? []).forEach((b) => relevantSet.add(b));
+      });
+      // If we found category-specific brands, use them; else fall back to all
+      if (relevantSet.size > 0) return Array.from(relevantSet).sort();
+    }
+    // Unknown query or no category match: show all brands
+    const all = new Set<string>();
+    Object.values(dynamicBrandsByCategory).forEach((brands) => brands.forEach((b) => all.add(b)));
+    return Array.from(all).sort();
+  }, [query, dynamicBrandsByCategory]);
 
   useEffect(() => {
     sessionStorage.setItem('lastSearchQuery', query);
   }, [query]);
+
 
   const updateFilters = (newSort: SortOption, newTags: string[]) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -187,9 +264,11 @@ function SearchContent() {
   }
 
   if (selectedTags.length > 0) {
-    const brandSet = new Set(dynamicBrands.map(normalizeFilterValue));
-    const selectedBrands = selectedTags.filter((tag) => brandSet.has(normalizeFilterValue(tag)));
-    const selectedCategoryTags = selectedTags.filter((tag) => !brandSet.has(normalizeFilterValue(tag)));
+    const allBrandsSet = new Set(
+      Object.values(dynamicBrandsByCategory).flatMap((brands) => brands.map(normalizeFilterValue)),
+    );
+    const selectedBrands = selectedTags.filter((tag) => allBrandsSet.has(normalizeFilterValue(tag)));
+    const selectedCategoryTags = selectedTags.filter((tag) => !allBrandsSet.has(normalizeFilterValue(tag)));
 
     filtered = filtered.filter((p) => {
       const productFilterTags = [
@@ -362,7 +441,7 @@ function SearchContent() {
                 )}
               </div>
               <div className="flex flex-wrap gap-2">
-                {getFilterTags(query).map((tag) => {
+                {getFilterTags(query, dynamicSubTypesByCategory).map((tag) => {
                   const isActive = selectedTags.includes(tag);
                   return (
                     <button
@@ -396,10 +475,10 @@ function SearchContent() {
                 )}
               </div>
               <div className="flex flex-wrap gap-2">
-                {dynamicBrands.length === 0 && isLoading && (
+                {visibleBrands.length === 0 && isLoading && (
                   <span className="text-sm text-slate-400">Yükleniyor...</span>
                 )}
-                {dynamicBrands.map((brand) => {
+                {visibleBrands.map((brand) => {
                   const isActive = selectedTags.includes(brand);
                   return (
                     <button

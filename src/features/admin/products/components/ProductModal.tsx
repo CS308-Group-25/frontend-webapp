@@ -1,42 +1,162 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { Check, Plus, X } from 'lucide-react';
+import type { CategoryOption } from '@/features/products';
 import type { Product, ProductFlavor, ProductSize } from '@/features/products';
 
 interface ProductModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (product: Omit<Product, 'id'> | Product) => void;
+  onSave: (product: Omit<Product, 'id'> | Product) => void | Promise<void>;
   initialData?: Product;
+  categories?: CategoryOption[];
+  brandOptions?: string[];
+  subCategories?: { id: number; name: string; category_id: number }[];
+  categoryOptions?: Record<number, { brands: string[]; subTypes: string[] }>;
+  isSaving?: boolean;
 }
 
-export default function ProductModal({ isOpen, onClose, onSave, initialData }: ProductModalProps) {
+const DEFAULT_FLAVOR_COLOR = '#E5E7EB';
+const FLAVOR_COLOR_OPTIONS = [
+  DEFAULT_FLAVOR_COLOR,
+  '#5C3317',
+  '#D2A679',
+  '#F3E5AB',
+  '#E8474C',
+  '#FFE135',
+  '#F59E0B',
+  '#C68E4E',
+  '#22C55E',
+  '#3B82F6',
+  '#7C3AED',
+  '#1E293B',
+];
+const FLAVOR_COLOR_BY_NAME: Record<string, string> = {
+  aromasız: DEFAULT_FLAVOR_COLOR,
+  çikolata: '#5C3317',
+  cikolata: '#5C3317',
+  bisküvi: '#D2A679',
+  biskuvi: '#D2A679',
+  biscuit: '#D2A679',
+  cookie: '#D2A679',
+  vanilya: '#F3E5AB',
+  vanilla: '#F3E5AB',
+  çilek: '#E8474C',
+  cilek: '#E8474C',
+  strawberry: '#E8474C',
+  muz: '#FFE135',
+  banana: '#FFE135',
+  mango: '#F59E0B',
+  karamel: '#C68E4E',
+  caramel: '#C68E4E',
+  'salted caramel': '#C68E4E',
+  'orman meyveli': '#7C3AED',
+  'blue raspberry': '#3B82F6',
+  cola: '#78350F',
+};
+
+function normalizeFlavorName(name: string): string {
+  return name.trim().toLocaleLowerCase('tr-TR');
+}
+
+function isHexColor(value?: string): value is string {
+  return Boolean(value && /^#[0-9A-Fa-f]{6}$/.test(value));
+}
+
+function getFlavorColor(flavor: Partial<ProductFlavor>): string {
+  if (isHexColor(flavor.color)) return flavor.color.toUpperCase();
+
+  return FLAVOR_COLOR_BY_NAME[normalizeFlavorName(flavor.name || '')] || DEFAULT_FLAVOR_COLOR;
+}
+
+function normalizeFlavor(flavor: ProductFlavor): ProductFlavor {
+  return {
+    ...flavor,
+    color: getFlavorColor(flavor),
+  };
+}
+
+function normalizeCategoryName(value?: string): string {
+  return value?.trim().toLocaleLowerCase('tr-TR') ?? '';
+}
+
+function isMissingNumber(value: unknown): boolean {
+  return value === '' || value === undefined || value === null || !Number.isFinite(Number(value));
+}
+
+export default function ProductModal({
+  isOpen,
+  onClose,
+  onSave,
+  initialData,
+  categories = [],
+  brandOptions = [],
+  subCategories = [],
+  categoryOptions = {},
+  isSaving = false,
+}: ProductModalProps) {
   const [formData, setFormData] = useState<Partial<Product>>({
     name: '',
     description: '',
-    price: 0,
     image: '',
-    stockStatus: 'in_stock',
     stockCount: 0,
     category: '',
+    categoryId: undefined,
     ingredients: '',
     usage: '',
     features: [],
     nutritionFacts: [],
   });
+  const [isAddingBrand, setIsAddingBrand] = useState(false);
+  const [newBrand, setNewBrand] = useState('');
+  const isCategorySelected = categories.length > 0
+    ? Boolean(formData.categoryId)
+    : Boolean(formData.category?.trim());
+  const selectedCategoryOptions = (() => {
+    if (formData.categoryId != null) {
+      const categoryOption = categoryOptions[formData.categoryId];
+      if (categoryOption) return categoryOption;
+    }
+    const normalizedCategory = normalizeCategoryName(formData.category);
+    const matchedCategory = categories.find(
+      (category) => normalizeCategoryName(category.name) === normalizedCategory,
+    );
+    return matchedCategory ? categoryOptions[matchedCategory.id] : undefined;
+  })();
+  const baseBrandOptions: string[] = brandOptions.length ? brandOptions : (selectedCategoryOptions?.brands ?? []);
+  
+  const normalizedBaseBrandOptions = Array.from(
+    new Set(baseBrandOptions.map((option) => option?.trim()).filter((option): option is string => Boolean(option))),
+  );
+  
+  const currentBrand = formData.brand?.trim();
+  const currentSubType = formData.subType?.trim();
+  
+  const availableBrandOptions = currentBrand
+    ? Array.from(new Set([...normalizedBaseBrandOptions, currentBrand]))
+    : normalizedBaseBrandOptions;
+    
+  const filteredSubCategories = subCategories.filter(sub => sub.category_id === Number(formData.categoryId));
+  
+  const isCustomBrand = currentBrand ? !normalizedBaseBrandOptions.includes(currentBrand) : false;
 
   useEffect(() => {
+    setIsAddingBrand(false);
+    setNewBrand('');
+
     if (initialData) {
-      setFormData(initialData);
+      setFormData({
+        ...initialData,
+        flavors: initialData.flavors?.map(normalizeFlavor),
+      });
     } else {
       setFormData({
         name: '',
         description: '',
-        price: 0,
         image: '',
-        stockStatus: 'in_stock',
         stockCount: 0,
         category: '',
+        categoryId: undefined,
         ingredients: '',
         usage: '',
         features: [],
@@ -55,7 +175,38 @@ export default function ProductModal({ isOpen, onClose, onSave, initialData }: P
       return;
     }
 
+    if (name === 'categoryId') {
+      const categoryId = value === '' ? undefined : Number(value);
+      const category = categories.find((item) => item.id === categoryId);
+
+      setFormData((prev) => ({
+        ...prev,
+        categoryId,
+        category: category?.name || '',
+        brand: '',
+        subType: '',
+      }));
+      setIsAddingBrand(false);
+      setNewBrand('');
+      return;
+    }
+
+    if (name === 'category') {
+      setFormData((prev) => ({
+        ...prev,
+        category: value,
+        brand: value.trim() ? prev.brand : '',
+        subType: value.trim() ? prev.subType : '',
+      }));
+      return;
+    }
+
     // Handle number inputs properly
+    if (name === 'brand' || name === 'subType') {
+      setFormData((prev) => ({ ...prev, [name]: value.trim() }));
+      return;
+    }
+
     if (type === 'number') {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setFormData((prev: any) => ({ ...prev, [name]: value === '' ? '' : Number(value) }));
@@ -63,6 +214,17 @@ export default function ProductModal({ isOpen, onClose, onSave, initialData }: P
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
   };
+
+  const handleSaveCustomBrand = () => {
+    const value = newBrand.trim();
+    if (!value) return;
+
+    setFormData((prev) => ({ ...prev, brand: value }));
+    setNewBrand('');
+    setIsAddingBrand(false);
+  };
+
+
 
   const handleAddNutrition = () => {
     setFormData((prev) => ({
@@ -89,14 +251,26 @@ export default function ProductModal({ isOpen, onClose, onSave, initialData }: P
   const handleAddFlavor = () => {
     setFormData((prev) => ({
       ...prev,
-      flavors: [...(prev.flavors || []), { id: `flv_${Date.now()}`, name: '', color: '#E5E7EB' }],
+      flavors: [...(prev.flavors || []), { id: `flv_${Date.now()}`, name: '', color: DEFAULT_FLAVOR_COLOR }],
     }));
   };
 
   const handleFlavorChange = (index: number, field: keyof ProductFlavor, value: string) => {
     setFormData((prev) => {
       const newFlavors = [...(prev.flavors || [])];
-      newFlavors[index] = { ...newFlavors[index], [field]: value };
+      const nextFlavor = { ...newFlavors[index], [field]: value };
+
+      if (field === 'name') {
+        const currentColor = newFlavors[index]?.color;
+        const shouldAutoColor = !isHexColor(currentColor) || currentColor.toUpperCase() === DEFAULT_FLAVOR_COLOR;
+        newFlavors[index] = {
+          ...nextFlavor,
+          color: shouldAutoColor ? getFlavorColor(nextFlavor) : currentColor,
+        };
+      } else {
+        newFlavors[index] = { ...nextFlavor, color: getFlavorColor(nextFlavor) };
+      }
+
       return { ...prev, flavors: newFlavors };
     });
   };
@@ -120,7 +294,11 @@ export default function ProductModal({ isOpen, onClose, onSave, initialData }: P
     setFormData((prev: any) => {
       const newSizes = [...(prev.sizes || [])];
       if (field === 'servings' || field === 'price' || field === 'originalPrice') {
-        newSizes[index] = { ...newSizes[index], [field]: value === '' ? '' : Number(value) };
+        const normalizedValue = value.replace(',', '.');
+        newSizes[index] = {
+          ...newSizes[index],
+          [field]: value === '' ? '' : Number(normalizedValue),
+        };
       } else {
         newSizes[index] = { ...newSizes[index], [field]: value };
       }
@@ -135,9 +313,86 @@ export default function ProductModal({ isOpen, onClose, onSave, initialData }: P
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    onSave(formData as Product);
+
+    const effectiveFormData = {
+      ...formData,
+      brand: isAddingBrand && newBrand.trim() ? newBrand.trim() : formData.brand,
+    };
+
+    const hasCategory = categories.length > 0 ? Boolean(effectiveFormData.categoryId) : Boolean(effectiveFormData.category?.trim());
+    const hasRequiredTextFields = Boolean(
+      hasCategory
+        && effectiveFormData.brand?.trim()
+        && effectiveFormData.subType?.trim()
+        && effectiveFormData.name?.trim()
+        && effectiveFormData.description?.trim()
+        && effectiveFormData.image?.trim()
+        && effectiveFormData.features?.some((feature) => feature.trim())
+        && effectiveFormData.ingredients?.trim()
+        && effectiveFormData.usage?.trim(),
+    );
+
+    if (!hasRequiredTextFields) {
+      e.currentTarget.reportValidity();
+      return;
+    }
+
+    const stockCount = effectiveFormData.stockCount as unknown;
+    if (isMissingNumber(stockCount) || Number(stockCount) < 0) {
+      e.currentTarget.querySelector<HTMLInputElement>('[name="stockCount"]')?.focus();
+      return;
+    }
+
+    const sizes = (effectiveFormData.sizes || []).map((size) => ({
+      ...size,
+      label: size.label.trim(),
+      servings: Number(size.servings),
+      price: Number(size.price) || 0,
+      originalPrice: isMissingNumber(size.originalPrice) ? undefined : Number(size.originalPrice),
+    }));
+    const invalidSize = sizes.find(
+      (size) => !size.label || !Number.isFinite(size.servings) || size.servings <= 0,
+    );
+
+    if (invalidSize) {
+      return;
+    }
+
+    const flavors = (formData.flavors || []).map((flavor) => normalizeFlavor({
+      ...flavor,
+      name: flavor.name.trim(),
+    }));
+    const invalidFlavor = flavors.find((flavor) => !flavor.name);
+
+    if (invalidFlavor) {
+      return;
+    }
+
+    const nutritionFacts = (effectiveFormData.nutritionFacts || []).map((fact) => ({
+      label: fact.label.trim(),
+      perServing: fact.perServing.trim(),
+      per100g: fact.per100g?.trim() || undefined,
+    }));
+    const invalidNutrition = nutritionFacts.find((fact) => !fact.label || !fact.perServing || !fact.per100g);
+
+    if (invalidNutrition) {
+      return;
+    }
+
+    const sanitizedProduct = {
+      ...effectiveFormData,
+      stockCount: Number(stockCount),
+      features: (effectiveFormData.features || []).map((feature) => feature.trim()).filter(Boolean),
+      flavors,
+      sizes,
+      nutritionFacts,
+      ingredients: effectiveFormData.ingredients?.trim() || '',
+      usage: effectiveFormData.usage?.trim() || '',
+    };
+
+    onSave(sanitizedProduct as Product);
   };
 
   return (
@@ -181,29 +436,156 @@ export default function ProductModal({ isOpen, onClose, onSave, initialData }: P
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="mb-1.5 block text-sm font-bold text-slate-700">Fiyat (TL)</label>
+            <div>
+              <label className="mb-1.5 block text-sm font-bold text-slate-700">Kategori</label>
+
+              {categories.length > 0 ? (
+                <select
+                  required
+                  name="categoryId"
+                  value={formData.categoryId ?? ''}
+                  onChange={handleChange}
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none transition-colors focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                >
+                  <option value="">Kategori seç</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
                 <input
                   required
-                  type="number"
-                  name="price"
-                  min="0"
-                  step="0.01"
-                  value={formData.price === 0 ? '' : formData.price}
-                  onChange={handleChange}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none transition-colors focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-bold text-slate-700">Kategori</label>
-                <input
                   name="category"
                   value={formData.category || ''}
                   onChange={handleChange}
                   className="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none transition-colors focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                   placeholder="Örn: Protein"
                 />
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="mb-1.5 flex min-h-[28px] items-center justify-between gap-2">
+                  <label className="block text-sm font-bold text-slate-700">Marka</label>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingBrand(true)}
+                    disabled={!isCategorySelected}
+                    className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-indigo-600 disabled:cursor-not-allowed disabled:text-slate-300"
+                    aria-label="Yeni marka ekle"
+                    title="Yeni marka ekle"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </div>
+                {isAddingBrand ? (
+                  <div className="flex gap-2">
+                    <input
+                      required
+                      autoFocus
+                      value={newBrand}
+                      onChange={(e) => setNewBrand(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleSaveCustomBrand();
+                        }
+                        if (e.key === 'Escape') {
+                          setNewBrand('');
+                          setIsAddingBrand(false);
+                        }
+                      }}
+                      className="min-w-0 flex-1 rounded-xl border border-slate-200 px-4 py-2.5 outline-none transition-colors focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                      placeholder="Yeni marka"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSaveCustomBrand}
+                      className="rounded-xl border border-slate-200 p-2.5 text-emerald-600 transition-colors hover:bg-emerald-50"
+                      aria-label="Markayı ekle"
+                      title="Markayı ekle"
+                    >
+                      <Check className="h-5 w-5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewBrand('');
+                        setIsAddingBrand(false);
+                      }}
+                      className="rounded-xl border border-slate-200 p-2.5 text-slate-500 transition-colors hover:bg-slate-50"
+                      aria-label="Vazgeç"
+                      title="Vazgeç"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                ) : isCustomBrand ? (
+                  <input
+                    required
+                    name="brand"
+                    value={formData.brand || ''}
+                    onChange={handleChange}
+                    disabled={!isCategorySelected}
+                    className="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none transition-colors focus:border-indigo-500 focus:ring-1 disabled:bg-slate-50 disabled:text-slate-400"
+                    placeholder={isCategorySelected ? 'Örn: Optimum Nutrition' : 'Önce kategori seç'}
+                  />
+                ) : availableBrandOptions.length > 0 ? (
+                  <select
+                    required
+                    name="brand"
+                    value={currentBrand ?? ''}
+                    onChange={handleChange}
+                    disabled={!isCategorySelected}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 outline-none transition-colors focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:bg-slate-50 disabled:text-slate-400"
+                  >
+                    <option value="">{isCategorySelected ? 'Marka seç' : 'Önce kategori seç'}</option>
+                    {availableBrandOptions.map((brand, index) => (
+                      <option key={`${brand}-${index}`} value={brand}>
+                        {brand}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    required
+                    name="brand"
+                    value={formData.brand || ''}
+                    onChange={handleChange}
+                    disabled={!isCategorySelected}
+                    className="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none transition-colors disabled:bg-slate-50 disabled:text-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                    placeholder={isCategorySelected ? 'Örn: Optimum Nutrition' : 'Önce kategori seç'}
+                  />
+                )}
+              </div>
+              <div>
+                <div className="mb-1.5 flex min-h-[28px] items-center justify-between gap-2">
+                  <label className="block text-sm font-bold text-slate-700">Alt Kategori</label>
+                </div>
+                <select
+                  required
+                  name="subType"
+                  value={currentSubType ?? ''}
+                  onChange={handleChange}
+                  disabled={!isCategorySelected || filteredSubCategories.length === 0}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 outline-none transition-colors focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:bg-slate-50 disabled:text-slate-400"
+                >
+                  <option value="">
+                    {!isCategorySelected
+                      ? 'Önce kategori seç'
+                      : filteredSubCategories.length === 0
+                        ? 'Bu kategori için alt kategori bulunamadı'
+                        : 'Alt kategori seç'}
+                  </option>
+                  {filteredSubCategories.map((sub) => (
+                    <option key={sub.id} value={sub.name}>
+                      {sub.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -219,32 +601,17 @@ export default function ProductModal({ isOpen, onClose, onSave, initialData }: P
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="mb-1.5 block text-sm font-bold text-slate-700">Stok Durumu</label>
-                <select
-                  name="stockStatus"
-                  value={formData.stockStatus || 'in_stock'}
-                  onChange={handleChange}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none transition-colors focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                >
-                  <option value="in_stock">Stokta Var</option>
-                  <option value="low_stock">Az Kaldı</option>
-                  <option value="out_of_stock">Tükendi</option>
-                </select>
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-bold text-slate-700">Stok Sayısı (Tükendi değilse)</label>
-                <input
-                  type="number"
-                  name="stockCount"
-                  min="0"
-                  disabled={formData.stockStatus === 'out_of_stock'}
-                  value={formData.stockStatus === 'out_of_stock' ? 0 : (formData.stockCount === 0 ? '' : formData.stockCount)}
-                  onChange={handleChange}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none transition-colors disabled:bg-slate-50 disabled:text-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                />
-              </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-bold text-slate-700">Stok Sayısı</label>
+              <input
+                required
+                type="number"
+                name="stockCount"
+                min="0"
+                value={formData.stockCount ?? ''}
+                onChange={handleChange}
+                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none transition-colors focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
             </div>
 
             {/* VARYANTLAR */}
@@ -267,64 +634,75 @@ export default function ProductModal({ isOpen, onClose, onSave, initialData }: P
                     <p className="text-sm text-slate-400">Ürüne ait aroma bulunmuyor.</p>
                   )}
                   <div className="flex flex-col gap-3">
-                    {formData.flavors?.map((flavor, index) => (
-                      <div key={index} className="flex flex-col gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
-                        <div className="flex items-center gap-2">
-                          <input
-                            required
-                            placeholder="Aroma Adı (Örn: Çikolata)"
-                            value={flavor.name}
-                            onChange={(e) => handleFlavorChange(index, 'name', e.target.value)}
-                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveFlavor(index)}
-                            className="rounded-lg bg-white p-2 text-red-500 shadow-sm transition-colors hover:bg-red-50"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                        <div className="flex items-center gap-3 px-1">
-                          <span className="text-xs font-bold text-slate-500">Renk:</span>
-                          <div className="flex flex-wrap items-center gap-2">
-                            {[
-                              '#E5E7EB', '#5C3317', '#F3E5AB', '#E8474C',
-                              '#FFE135', '#F59E0B', '#22C55E', '#3B82F6', '#7C3AED', '#1E293B'
-                            ].map((c) => (
-                              <button
-                                key={c}
-                                type="button"
-                                onClick={() => handleFlavorChange(index, 'color', c)}
-                                className={`h-6 w-6 rounded-full border border-black/10 shadow-sm transition-transform hover:scale-110 ${
-                                  flavor.color.toUpperCase() === c.toUpperCase()
-                                    ? 'ring-2 ring-indigo-500 ring-offset-2'
-                                    : ''
+                    {formData.flavors?.map((flavor, index) => {
+                      const flavorColor = getFlavorColor(flavor);
+                      const hasPresetColor = FLAVOR_COLOR_OPTIONS.some((color) => color.toUpperCase() === flavorColor);
+
+                      return (
+                        <div key={index} className="flex flex-col gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
+                          <div className="flex items-center gap-2">
+                            <input
+                              required
+                              placeholder="Aroma Adı (Örn: Çikolata)"
+                              value={flavor.name}
+                              onChange={(e) => handleFlavorChange(index, 'name', e.target.value)}
+                              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveFlavor(index)}
+                              className="rounded-lg bg-white p-2 text-red-500 shadow-sm transition-colors hover:bg-red-50"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-3 px-1">
+                            <span className="text-xs font-bold text-slate-500">Renk:</span>
+                            <div className="flex flex-wrap items-center gap-2">
+                              {FLAVOR_COLOR_OPTIONS.map((color) => (
+                                <button
+                                  key={color}
+                                  type="button"
+                                  onClick={() => handleFlavorChange(index, 'color', color)}
+                                  className={`h-6 w-6 rounded-full border border-black/10 shadow-sm transition-transform hover:scale-110 ${
+                                    flavorColor === color.toUpperCase()
+                                      ? 'ring-2 ring-indigo-500 ring-offset-2'
+                                      : ''
+                                  }`}
+                                  style={{ backgroundColor: color }}
+                                  title={color}
+                                />
+                              ))}
+                              <div
+                                className={`relative ml-1 h-6 w-6 cursor-pointer overflow-hidden rounded-full border border-slate-300 shadow-inner transition-transform hover:scale-110 ${
+                                  hasPresetColor ? '' : 'ring-2 ring-indigo-500 ring-offset-2'
                                 }`}
-                                style={{ backgroundColor: c }}
-                                title={c}
-                              />
-                            ))}
-                            <div className="relative ml-1 h-6 w-6 cursor-pointer overflow-hidden rounded-full border border-slate-300 bg-[conic-gradient(red,yellow,green,cyan,blue,magenta,red)] shadow-inner transition-transform hover:scale-110">
-                              <input
-                                type="color"
-                                value={flavor.color}
-                                onChange={(e) => handleFlavorChange(index, 'color', e.target.value)}
-                                className="absolute -inset-4 h-14 w-14 cursor-pointer opacity-0"
-                                title="Özel Renk Seç"
-                              />
+                                style={{
+                                  background: hasPresetColor
+                                    ? 'conic-gradient(red,yellow,green,cyan,blue,magenta,red)'
+                                    : flavorColor,
+                                }}
+                              >
+                                <input
+                                  type="color"
+                                  value={flavorColor}
+                                  onChange={(e) => handleFlavorChange(index, 'color', e.target.value)}
+                                  className="absolute -inset-4 h-14 w-14 cursor-pointer opacity-0"
+                                  title="Özel Renk Seç"
+                                />
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
                 {/* Boyutlar */}
                 <div className="rounded-xl border border-slate-200 p-4">
                   <div className="mb-3 flex items-center justify-between">
-                    <label className="text-sm font-bold text-slate-700">Boyutlar & Fiyatlar</label>
+                    <label className="text-sm font-bold text-slate-700">Boyutlar</label>
                     <button
                       type="button"
                       onClick={handleAddSize}
@@ -349,17 +727,10 @@ export default function ProductModal({ isOpen, onClose, onSave, initialData }: P
                         <input
                           required
                           type="number"
+                          min="1"
                           placeholder="Servis (Örn: 16)"
                           value={size.servings === 0 ? '' : (size.servings ?? '')}
                           onChange={(e) => handleSizeChange(index, 'servings', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 sm:w-24 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        />
-                        <input
-                          required
-                          type="number"
-                          placeholder="Fiyat"
-                          value={size.price === 0 ? '' : (size.price ?? '')}
-                          onChange={(e) => handleSizeChange(index, 'price', e.target.value)}
                           className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 sm:w-24 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                         <button
@@ -383,6 +754,7 @@ export default function ProductModal({ isOpen, onClose, onSave, initialData }: P
                 <div>
                   <label className="mb-1.5 block text-sm font-bold text-slate-700">Özellikler (Her satıra bir özellik)</label>
                   <textarea
+                    required
                     name="features"
                     value={formData.features ? formData.features.join('\n') : ''}
                     onChange={handleChange}
@@ -424,7 +796,8 @@ export default function ProductModal({ isOpen, onClose, onSave, initialData }: P
                           className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1"
                         />
                         <input
-                          placeholder="100g Başı (Opsiyonel)"
+                          required
+                          placeholder="100g Başı (Örn: 400 kcal)"
                           value={fact.per100g || ''}
                           onChange={(e) => handleNutritionChange(index, 'per100g', e.target.value)}
                           className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1"
@@ -481,9 +854,10 @@ export default function ProductModal({ isOpen, onClose, onSave, initialData }: P
           <button
             type="submit"
             form="product-form"
-            className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-indigo-700 active:scale-95"
+            disabled={isSaving}
+            className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-indigo-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {initialData ? 'Güncelle' : 'Kaydet'}
+            {isSaving ? 'Kaydediliyor...' : initialData ? 'Güncelle' : 'Kaydet'}
           </button>
         </div>
       </div>

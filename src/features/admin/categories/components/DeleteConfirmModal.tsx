@@ -14,7 +14,7 @@ export default function DeleteConfirmModal({
 }: DeleteConfirmModalProps) {
   if (!category) return null;
 
-  const hasProducts = category.productCount > 0;
+  const hasProducts = (category.productCount || 0) > 0;
 
   return (
     <div
@@ -54,7 +54,7 @@ export default function DeleteConfirmModal({
                 <p className="text-xs font-bold text-red-700">Bağlı ürünler etkilenecek</p>
                 <p className="mt-0.5 text-xs text-red-600">
                   Bu kategoriye ait{' '}
-                  <span className="font-bold">{category.productCount} ürün</span>{' '}
+                  <span className="font-bold">{category.productCount || 0} ürün</span>{' '}
                   bulunmaktadır. Silme işlemi bu ürünleri kategorisiz bırakabilir.
                 </p>
               </div>
