@@ -1,7 +1,6 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useState, useEffect } from 'react';
 import { Check, Plus, X } from 'lucide-react';
-import type { CategoryOption } from '@/features/products';
 import type { Product, ProductFlavor, ProductSize } from '@/features/products';
 
 interface ProductModalProps {

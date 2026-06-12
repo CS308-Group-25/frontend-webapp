@@ -328,15 +328,16 @@ export default function AdminProductsPage() {
     const optionsById: Record<number, CategoryOptionSet> = {};
     const optionsByName: Record<string, CategoryOptionSet> = {};
 
-    getCatalogCategoryEntries(productsData as ProductListingMetadata | undefined).forEach((category) => {
-      if (!category || typeof category !== 'object') return;
+    const catalogEntries = getCatalogCategoryEntries(productsData as ProductListingMetadata | undefined);
+    for (const category of catalogEntries) {
+      if (!category || typeof category !== 'object') continue;
 
       const idValue = category.id ?? category.category_id ?? category.categoryId;
       const categoryId = typeof idValue === 'number' ? idValue : Number(idValue);
       const categoryName = getFirstString(category.name, category.title, category.label, category.value, category.category);
       const options = {
-        brands: [],
-        subTypes: [],
+        brands: [] as string[],
+        subTypes: [] as string[],
       };
 
       Object.assign(options, {
@@ -363,14 +364,14 @@ export default function AdminProductsPage() {
         ],
       });
 
-      if (options.brands.length === 0 && options.subTypes.length === 0) return;
+      if (options.brands.length === 0 && options.subTypes.length === 0) continue;
       if (Number.isFinite(categoryId)) {
         optionsById[categoryId] = options;
       }
       if (categoryName) {
         optionsByName[normalizeCategoryName(categoryName)] = options;
       }
-    });
+    }
 
     return { optionsById, optionsByName };
   }, [productsData]);
