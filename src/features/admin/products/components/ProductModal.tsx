@@ -8,9 +8,9 @@ interface ProductModalProps {
   onClose: () => void;
   onSave: (product: Omit<Product, 'id'> | Product) => void | Promise<void>;
   initialData?: Product;
-  categories?: CategoryOption[];
+  categories?: { id: number; name: string }[];
   brandOptions?: string[];
-  subCategories?: { id: number; name: string; category_id: number }[];
+  subCategories?: { id: number; name: string; category_id?: number }[];
   categoryOptions?: Record<number, { brands: string[]; subTypes: string[] }>;
   isSaving?: boolean;
 }
