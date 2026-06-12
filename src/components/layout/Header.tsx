@@ -20,6 +20,7 @@ import {
   FileText,
   Layers,
   LineChart,
+  Percent,
 } from 'lucide-react';
 import { useAuthStore, logoutUser } from '@/features/auth';
 import { useCartStore, CartDrawer } from '@/features/cart';
@@ -413,7 +414,7 @@ export default function Header() {
                         className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold text-slate-700 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
                       >
                         <RotateCcw className="h-4 w-4" />
-                        Refund Requests
+                        İade Talepleri
                       </Link>
                       <Link
                         href="/admin/invoices"
@@ -421,7 +422,7 @@ export default function Header() {
                         className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold text-slate-700 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
                       >
                         <FileText className="h-4 w-4" />
-                        Invoices
+                        Faturalar
                       </Link>
                       <Link
                         href="/admin/revenue"
@@ -429,7 +430,15 @@ export default function Header() {
                         className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold text-slate-700 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
                       >
                         <LineChart className="h-4 w-4" />
-                        Revenue Report
+                        Gelir Raporu
+                      </Link>
+                      <Link
+                        href="/admin/discounts"
+                        onClick={() => setIsSalesManagerPanelOpen(false)}
+                        className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold text-slate-700 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
+                      >
+                        <Percent className="h-4 w-4" />
+                        İndirim Yönetimi
                       </Link>
                     </div>
                   )}
