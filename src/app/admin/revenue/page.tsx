@@ -24,7 +24,8 @@ import {
   TrendingUp,
   Banknote,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Percent
 } from 'lucide-react';
 import apiClient from '@/lib/api-client';
 import { useAuthStore } from '@/features/auth';
@@ -127,6 +128,25 @@ export default function AdminRevenuePage() {
     
     const sortedData = [...reportData.chart_data].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     if (sortedData.length === 0) return [];
+
+    if (sortedData.length > 730) {
+      const yearlyMap = new Map<string, { date: string, revenue: number, profit: number }>();
+      sortedData.forEach(day => {
+        const d = new Date(day.date);
+        const yearKey = `${d.getFullYear()}-01-01`;
+        if (!yearlyMap.has(yearKey)) {
+          yearlyMap.set(yearKey, { date: yearKey, revenue: 0, profit: 0 });
+        }
+        const y = yearlyMap.get(yearKey)!;
+        y.revenue += Number(day.revenue);
+        y.profit += Number(day.profit);
+      });
+      
+      return Array.from(yearlyMap.values()).map(year => ({
+        ...year,
+        formattedDate: new Date(year.date).getFullYear().toString()
+      }));
+    }
 
     if (sortedData.length > 60) {
       const monthlyMap = new Map<string, { date: string, revenue: number, profit: number }>();
@@ -394,126 +414,149 @@ export default function AdminRevenuePage() {
         </div>
       ) : reportData ? (
         <div className="space-y-6">
-          {/* Stat Cards */}
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200 flex items-start gap-4">
-              <div className="rounded-xl bg-green-50 p-3 text-green-600">
-                <TrendingUp className="h-6 w-6" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-slate-500">Toplam Gelir</p>
-                <p className="mt-1 text-2xl font-black text-slate-900">
+          <div className="grid gap-6 lg:grid-cols-4">
+            {/* Chart Section */}
+            <div className="lg:col-span-3 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200 flex flex-col">
+              <h3 className="mb-6 text-lg font-bold text-slate-800">Gelir ve Kar Grafiği</h3>
+              {chartData.length > 0 ? (
+                <div className="h-[400px] w-full mt-auto overflow-x-auto overflow-y-hidden">
+                  <div style={{ minWidth: chartData.length > 15 ? `${chartData.length * 45}px` : '100%', height: '100%' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={chartData}
+                        margin={{ top: 30, right: 30, left: 20, bottom: 5 }}
+                        barGap={2}
+                        barCategoryGap="15%"
+                        maxBarSize={40}
+                      >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                      <XAxis 
+                        dataKey="formattedDate" 
+                        stroke="#94a3b8" 
+                        fontSize={12} 
+                        tickLine={false} 
+                        axisLine={false} 
+                        dy={10}
+                        minTickGap={30}
+                        interval="equidistantPreserveStart"
+                      />
+                      <YAxis 
+                        stroke="#94a3b8" 
+                        fontSize={12} 
+                        tickLine={false} 
+                        axisLine={false} 
+                        tickFormatter={(value: number | string) => `${Number(value) >= 1000 ? (Number(value) / 1000).toFixed(0) + 'k' : value}`}
+                        dx={-10}
+                      />
+                      <Tooltip 
+                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)' }}
+                        formatter={(value: any, name: any) => [`${Number(value || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL`, name]} // eslint-disable-line @typescript-eslint/no-explicit-any
+                        cursor={{ fill: '#f8fafc' }}
+                      />
+                      <Legend wrapperStyle={{ paddingTop: '20px' }} iconType="circle" />
+                      <Bar 
+                        dataKey="revenue" 
+                        name="Gelir" 
+                        fill="#16a34a" 
+                        radius={[4, 4, 0, 0]}
+                      >
+                        <LabelList 
+                          dataKey="revenue" 
+                          content={(props: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+                            const { x, y, width, value } = props;
+                            if (value === null || value === undefined) return null;
+                            const formattedValue = Number(value) >= 1000 ? `${(Number(value) / 1000).toFixed(0)}k` : value;
+                            return (
+                              <text x={Number(x) + Number(width) / 2} y={Number(y) - 5} fill="#16a34a" fontSize={11} fontWeight={700} textAnchor="middle">
+                                {formattedValue}
+                              </text>
+                            );
+                          }}
+                        />
+                      </Bar>
+                      <Bar 
+                        dataKey="profit" 
+                        name="Kar" 
+                        fill="#4f46e5" 
+                        radius={[4, 4, 0, 0]}
+                      >
+                        <LabelList 
+                          dataKey="profit" 
+                          content={(props: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+                            const { x, y, width, value } = props;
+                            if (value === null || value === undefined) return null;
+                            const formattedValue = Number(value) >= 1000 ? `${(Number(value) / 1000).toFixed(0)}k` : value;
+                            return (
+                              <text x={Number(x) + Number(width) / 2} y={Number(y) - 5} fill="#4f46e5" fontSize={11} fontWeight={700} textAnchor="middle">
+                                {formattedValue}
+                              </text>
+                            );
+                          }}
+                        />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex h-[400px] flex-col items-center justify-center rounded-xl bg-slate-50 text-center mt-auto">
+                  <LineChart className="mb-3 h-10 w-10 text-slate-300" />
+                  <p className="text-sm font-medium text-slate-500">Görüntülenecek grafik verisi bulunamadı.</p>
+                </div>
+              )}
+            </div>
+
+            {/* Stat Cards */}
+            <div className="flex flex-col gap-4">
+              <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 flex flex-col gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-xl bg-green-50 p-2 text-green-600">
+                    <TrendingUp className="h-5 w-5" />
+                  </div>
+                  <p className="text-sm font-semibold text-slate-500">Toplam Gelir</p>
+                </div>
+                <p className="text-2xl font-black text-slate-900">
                   {Number(reportData.revenue).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                 </p>
               </div>
-            </div>
-            
-            <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200 flex items-start gap-4">
-              <div className="rounded-xl bg-red-50 p-3 text-red-600">
-                <Banknote className="h-6 w-6" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-slate-500">Toplam Maliyet</p>
-                <p className="mt-1 text-2xl font-black text-slate-900">
+              
+              <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 flex flex-col gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-xl bg-red-50 p-2 text-red-600">
+                    <Banknote className="h-5 w-5" />
+                  </div>
+                  <p className="text-sm font-semibold text-slate-500">Toplam Maliyet</p>
+                </div>
+                <p className="text-2xl font-black text-slate-900">
                   {Number(reportData.cost).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                 </p>
               </div>
-            </div>
 
-            <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200 flex items-start gap-4">
-              <div className="rounded-xl bg-indigo-50 p-3 text-indigo-600">
-                <LineChart className="h-6 w-6" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-slate-500">Toplam Kar</p>
-                <p className="mt-1 text-2xl font-black text-slate-900">
+              <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 flex flex-col gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-xl bg-indigo-50 p-2 text-indigo-600">
+                    <LineChart className="h-5 w-5" />
+                  </div>
+                  <p className="text-sm font-semibold text-slate-500">Toplam Kar</p>
+                </div>
+                <p className="text-2xl font-black text-slate-900">
                   {Number(reportData.profit).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                </p>
+              </div>
+
+              <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 flex flex-col gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-xl bg-blue-50 p-2 text-blue-600">
+                    <Percent className="h-5 w-5" />
+                  </div>
+                  <p className="text-sm font-semibold text-slate-500">Kar Marjı</p>
+                </div>
+                <p className="text-2xl font-black text-slate-900">
+                  %{reportData.revenue > 0 ? ((Number(reportData.profit) / Number(reportData.revenue)) * 100).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0,00'}
                 </p>
               </div>
             </div>
           </div>
-
-          {/* Chart Section */}
-          <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-            <h3 className="mb-6 text-lg font-bold text-slate-800">Gelir ve Kar Grafiği</h3>
-            {chartData.length > 0 ? (
-              <div className="h-[400px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={chartData}
-                      margin={{ top: 30, right: 30, left: 20, bottom: 5 }}
-                      barGap={2}
-                      barCategoryGap="15%"
-                    >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                    <XAxis 
-                      dataKey="formattedDate" 
-                      stroke="#94a3b8" 
-                      fontSize={12} 
-                      tickLine={false} 
-                      axisLine={false} 
-                      dy={10}
-                      minTickGap={30}
-                      interval="equidistantPreserveStart"
-                    />
-                    <YAxis 
-                      stroke="#94a3b8" 
-                      fontSize={12} 
-                      tickLine={false} 
-                      axisLine={false} 
-                      tickFormatter={(value: number | string) => `${Number(value) >= 1000 ? (Number(value) / 1000).toFixed(0) + 'k' : value}`}
-                      dx={-10}
-                    />
-                    <Tooltip 
-                      contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)' }}
-                      formatter={(value: any, name: any) => [`${Number(value || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL`, name]} // eslint-disable-line @typescript-eslint/no-explicit-any
-                      cursor={{ fill: '#f8fafc' }}
-                    />
-                    <Legend wrapperStyle={{ paddingTop: '20px' }} iconType="circle" />
-                    <Bar 
-                      dataKey="revenue" 
-                      name="Gelir" 
-                      fill="#16a34a" 
-                      radius={[4, 4, 0, 0]}
-                    >
-                      <LabelList 
-                        dataKey="revenue" 
-                        position="top" 
-                        formatter={(value: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
-                          if (value === null || value === undefined) return '';
-                          return Number(value) >= 1000 ? `${(Number(value) / 1000).toFixed(0)}k` : value;
-                        }}
-                        style={{ fill: '#16a34a', fontSize: 11, fontWeight: 700 }}
-                      />
-                    </Bar>
-                    <Bar 
-                      dataKey="profit" 
-                      name="Kar" 
-                      fill="#4f46e5" 
-                      radius={[4, 4, 0, 0]}
-                    >
-                      <LabelList 
-                        dataKey="profit" 
-                        position="top" 
-                        formatter={(value: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
-                          if (value === null || value === undefined) return '';
-                          return Number(value) >= 1000 ? `${(Number(value) / 1000).toFixed(0)}k` : value;
-                        }}
-                        style={{ fill: '#4f46e5', fontSize: 11, fontWeight: 700 }}
-                      />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="flex h-[400px] flex-col items-center justify-center rounded-xl bg-slate-50 text-center">
-                <LineChart className="mb-3 h-10 w-10 text-slate-300" />
-                <p className="text-sm font-medium text-slate-500">Görüntülenecek grafik verisi bulunamadı.</p>
-              </div>
-            )}
-          </div>
-
-
         </div>
       ) : null}
     </div>
