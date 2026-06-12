@@ -2,17 +2,20 @@
 
 import { useState, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { PackagePlus, ArrowDownUp } from 'lucide-react';
+import { PackagePlus, ArrowDownUp, ShieldX } from 'lucide-react';
 import {
   AdminProductPayload,
   createAdminProduct,
   deleteAdminProduct,
   fetchAdminProducts,
+  fetchProducts,
   fetchCategories,
   fetchAdminProductDetail,
+  PaginatedProductResponse,
   Product,
   updateAdminProduct,
 } from '@/features/products';
+import { useAuthStore } from '@/features/auth';
 import ProductTable from '@/features/admin/products/components/ProductTable';
 import ProductModal from '@/features/admin/products/components/ProductModal';
 import { fetchAdminCategories } from '@/features/admin/categories/api/categories.api';
@@ -208,13 +211,16 @@ function getCatalogCategoryEntries(productsData: ProductListingMetadata | undefi
 
 export default function AdminProductsPage() {
   const queryClient = useQueryClient();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
+  const isAuthorized = isAuthenticated && (user?.role === 'product_manager' || user?.role === 'sales_manager');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | undefined>();
   const [sortBy, setSortBy] = useState<SortOption>('urgency');
 
   const { data: productsData, isLoading, isError } = useQuery({
     queryKey: ['products', 'admin'],
-    queryFn: () => fetchAdminProducts(1000),
+    queryFn: () => user?.role === 'sales_manager' ? fetchProducts(1000) : fetchAdminProducts(1000),
+    enabled: isAuthorized,
   });
   const { data: categories = [] } = useQuery({
     queryKey: ['categories'],
@@ -426,6 +432,15 @@ export default function AdminProductsPage() {
   );
   const isSaving = createProductMutation.isPending || updateProductMutation.isPending;
 
+  const handleSetPrice = (id: string, newPrice: number) => {
+    queryClient.setQueryData<PaginatedProductResponse>(
+      ['products', 'admin'],
+      (old) => old
+        ? { ...old, items: old.items.map((p) => p.id === id ? { ...p, price: newPrice } : p) }
+        : old
+    );
+  };
+
   const handleDeleteProduct = async (id: string) => {
     if (confirm('Bu ürünü silmek istediğinize emin misiniz?')) {
       await deleteProductMutation.mutateAsync(id);
@@ -480,6 +495,38 @@ export default function AdminProductsPage() {
     }
   }, [products, sortBy]);
 
+  if (authLoading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
+          <p className="text-sm font-medium text-slate-500">Yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthorized) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <div className="p-4 bg-red-50 rounded-2xl">
+            <ShieldX className="h-10 w-10 text-red-500" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-slate-900">Yetkisiz Erişim</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Bu sayfaya erişim için yönetici yetkisi gereklidir.
+            </p>
+          </div>
+          <Link href="/" className="text-sm font-medium text-indigo-600 hover:underline">
+            Ana sayfaya dön
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Header */}
@@ -515,13 +562,15 @@ export default function AdminProductsPage() {
               <option value="rating_asc">Rating (En Düşük)</option>
             </select>
           </div>
-          <button
-            onClick={openAddModal}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-indigo-500/20 transition-all hover:bg-indigo-700 hover:shadow-lg active:scale-95 sm:w-auto"
-          >
-            <PackagePlus className="h-5 w-5" />
-            Yeni Ürün
-          </button>
+          {user?.role === 'product_manager' && (
+            <button
+              onClick={openAddModal}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-indigo-500/20 transition-all hover:bg-indigo-700 hover:shadow-lg active:scale-95 sm:w-auto"
+            >
+              <PackagePlus className="h-5 w-5" />
+              Yeni Ürün
+            </button>
+          )}
         </div>
       </div>
 
@@ -538,8 +587,9 @@ export default function AdminProductsPage() {
       ) : (
         <ProductTable
           products={sortedProducts}
-          onEdit={openEditModal}
-          onDelete={handleDeleteProduct}
+          onEdit={user?.role === 'product_manager' ? openEditModal : undefined}
+          onDelete={user?.role === 'product_manager' ? handleDeleteProduct : undefined}
+          onSetPrice={user?.role === 'sales_manager' ? handleSetPrice : undefined}
         />
       )}
 
