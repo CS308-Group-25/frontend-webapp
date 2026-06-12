@@ -1,4 +1,4 @@
-import { Edit, Trash2, Tag, FolderPlus } from 'lucide-react';
+import { Edit, Trash2, Tag, FolderPlus, Package } from 'lucide-react';
 import type { Category } from '../types/category.types';
 
 interface CategoryTableProps {
@@ -41,7 +41,7 @@ export default function CategoryTable({
           <Tag className="h-10 w-10 text-indigo-300" />
         </div>
         <div className="text-center">
-          <p className="text-lg font-extrabold text-slate-800">Henüz kategori yok</p>
+          <p className="text-lg font-extrabold text-slate-800">Henüz alt kategori yok</p>
           <p className="mt-1.5 max-w-xs text-sm text-slate-400">
             Ürünlerinizi düzenlemek için ilk kategoriyi ekleyerek başlayın.
           </p>
@@ -52,7 +52,7 @@ export default function CategoryTable({
             className="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-indigo-500/20 transition-all hover:bg-indigo-700 active:scale-95"
           >
             <FolderPlus className="h-4 w-4" />
-            İlk Kategoriyi Ekle
+            İlk Alt Kategoriyi Ekle
           </button>
         )}
       </div>
@@ -65,7 +65,7 @@ export default function CategoryTable({
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50 text-slate-500">
             <tr>
-              <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider">Kategori Adı</th>
+              <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider">Alt Kategori Adı</th>
               <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider">Açıklama</th>
               <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">Ürün Sayısı</th>
               <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wider">İşlemler</th>
@@ -92,16 +92,11 @@ export default function CategoryTable({
                     <span className="italic text-slate-300">Açıklama yok</span>
                   )}
                 </td>
-                <td className="px-6 py-4 text-center">
-                  <span
-                    className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ${
-                      category.productCount > 0
-                        ? 'bg-indigo-50 text-indigo-700'
-                        : 'bg-slate-100 text-slate-400'
-                    }`}
-                  >
-                    {category.productCount} ürün
-                  </span>
+                <td className="whitespace-nowrap px-4 py-4 sm:px-6">
+                  <div className="flex items-center justify-center gap-1.5 text-sm font-semibold text-slate-700">
+                    <Package className="h-4 w-4 text-slate-400" />
+                    {category.productCount || 0}
+                  </div>
                 </td>
                 <td className="px-6 py-4 text-right">
                   <div className="flex justify-end gap-1.5">
@@ -130,7 +125,7 @@ export default function CategoryTable({
       <div className="border-t border-slate-100 bg-slate-50 px-6 py-2.5">
         <p className="text-xs text-slate-400">
           <span className="font-semibold text-slate-600">{categories.length}</span>{' '}
-          kategori gösteriliyor
+          alt kategori gösteriliyor
         </p>
       </div>
     </div>

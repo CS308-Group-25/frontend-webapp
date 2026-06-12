@@ -303,28 +303,23 @@ export default function Header() {
       {/* Category Navigation */}
       <nav className="relative border-t border-slate-50 bg-white/60 backdrop-blur-sm">
         <div className="mx-auto max-w-7xl px-4 py-2 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-1">
-            {/* Scrollable category links — kept in its own overflow container */}
-            <div className="scrollbar-hide flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+          <div className="scrollbar-hide flex items-center gap-1 overflow-x-auto lg:overflow-visible">
+            <Link
+              href="/search"
+              className="shrink-0 rounded-lg px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-indigo-600 transition-all hover:bg-indigo-50"
+            >
+              Tüm Ürünler
+            </Link>
+            <div className="h-4 w-px shrink-0 bg-slate-200" />
+            {categories.map((cat) => (
               <Link
-                href="/search"
-                className="shrink-0 rounded-lg px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-indigo-600 transition-all hover:bg-indigo-50"
+                key={cat.label}
+                href={cat.href}
+                className="shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-600 transition-all hover:bg-indigo-50 hover:text-indigo-600"
               >
-                Tüm Ürünler
+                {cat.label}
               </Link>
-              <div className="h-4 w-px shrink-0 bg-slate-200" />
-              {categories.map((cat) => (
-                <Link
-                  key={cat.label}
-                  href={cat.href}
-                  className="shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-600 transition-all hover:bg-indigo-50 hover:text-indigo-600"
-                >
-                  {cat.label}
-                </Link>
-              ))}
-            </div>
-
-            {/* Admin panel dropdowns — outside the overflow container so they are never clipped */}
+            ))}
             {isProductManager && (
               <>
                 <div className="h-4 w-px shrink-0 bg-slate-200" />
@@ -343,22 +338,14 @@ export default function Header() {
                     />
                   </button>
                   {isProductManagerPanelOpen && (
-                    <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-xl border border-slate-100 bg-white p-1.5 shadow-xl shadow-indigo-500/10">
+                    <div className="absolute left-0 top-full z-50 mt-2 w-56 rounded-xl border border-slate-100 bg-white p-1.5 shadow-xl shadow-indigo-500/10">
                       <Link
-                        href="/admin/products"
+                        href="/admin/reviews"
                         onClick={() => setIsProductManagerPanelOpen(false)}
                         className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold text-slate-700 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
                       >
-                        <Package className="h-4 w-4" />
-                        Ürün Yönetimi
-                      </Link>
-                      <Link
-                        href="/admin/categories"
-                        onClick={() => setIsProductManagerPanelOpen(false)}
-                        className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold text-slate-700 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
-                      >
-                        <Layers className="h-4 w-4" />
-                        Kategori Yönetimi
+                        <MessageSquare className="h-4 w-4" />
+                        Product Reviews
                       </Link>
                       <Link
                         href="/admin/orders"
@@ -366,15 +353,23 @@ export default function Header() {
                         className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold text-slate-700 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
                       >
                         <ClipboardList className="h-4 w-4" />
-                        Teslimat Kuyruğu
+                        Product Orders
                       </Link>
                       <Link
-                        href="/admin/reviews"
+                        href="/admin/products"
                         onClick={() => setIsProductManagerPanelOpen(false)}
                         className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold text-slate-700 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
                       >
-                        <MessageSquare className="h-4 w-4" />
-                        Yorum Moderasyonu
+                        <Package className="h-4 w-4" />
+                        Products
+                      </Link>
+                      <Link
+                        href="/admin/categories"
+                        onClick={() => setIsProductManagerPanelOpen(false)}
+                        className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold text-slate-700 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
+                      >
+                        <Layers className="h-4 w-4" />
+                        Categories
                       </Link>
                     </div>
                   )}
@@ -399,15 +394,7 @@ export default function Header() {
                     />
                   </button>
                   {isSalesManagerPanelOpen && (
-                    <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-xl border border-slate-100 bg-white p-1.5 shadow-xl shadow-indigo-500/10">
-                      <Link
-                        href="/admin/products"
-                        onClick={() => setIsSalesManagerPanelOpen(false)}
-                        className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold text-slate-700 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
-                      >
-                        <Package className="h-4 w-4" />
-                        Ürün Fiyatlandırma
-                      </Link>
+                    <div className="absolute left-0 top-full z-50 mt-2 w-56 rounded-xl border border-slate-100 bg-white p-1.5 shadow-xl shadow-indigo-500/10">
                       <Link
                         href="/admin/refunds"
                         onClick={() => setIsSalesManagerPanelOpen(false)}

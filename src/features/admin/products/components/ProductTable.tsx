@@ -1,16 +1,14 @@
 import { Edit, Trash2, Star } from 'lucide-react';
 import { Product, StockBadge } from '@/features/products';
 import Image from 'next/image';
-import SetPriceButton from './SetPriceButton';
 
 interface ProductTableProps {
   products: Product[];
-  onEdit?: (product: Product) => void;
-  onDelete?: (id: string) => void;
-  onSetPrice?: (productId: string, newPrice: number) => void;
+  onEdit: (product: Product) => void;
+  onDelete: (id: string) => void;
 }
 
-export default function ProductTable({ products, onEdit, onDelete, onSetPrice }: ProductTableProps) {
+export default function ProductTable({ products, onEdit, onDelete }: ProductTableProps) {
   if (products.length === 0) {
     return (
       <div className="flex min-h-[300px] flex-col items-center justify-center rounded-2xl bg-white p-8 shadow-sm">
@@ -26,7 +24,6 @@ export default function ProductTable({ products, onEdit, onDelete, onSetPrice }:
           <thead className="bg-slate-50 text-slate-600">
             <tr>
               <th className="px-6 py-4 font-bold">Ürün</th>
-              <th className="px-6 py-4 font-bold">Fiyat</th>
               <th className="px-6 py-4 font-bold">Kategori</th>
               <th className="px-6 py-4 font-bold">Değerlendirme</th>
               <th className="px-6 py-4 font-bold">Stok Durumu</th>
@@ -59,9 +56,6 @@ export default function ProductTable({ products, onEdit, onDelete, onSetPrice }:
                     </div>
                   </div>
                 </td>
-                <td className="px-6 py-4 font-semibold text-slate-700">
-                  {product.price.toLocaleString('tr-TR')} TL
-                </td>
                 <td className="px-6 py-4 text-slate-600">
                   {product.category || 'Belirtilmemiş'}
                 </td>
@@ -76,32 +70,21 @@ export default function ProductTable({ products, onEdit, onDelete, onSetPrice }:
                   <StockBadge status={product.stockStatus} count={product.stockCount} />
                 </td>
                 <td className="px-6 py-4 text-right">
-                  <div className="flex justify-end gap-2 items-center">
-                    {onSetPrice && (
-                      <SetPriceButton
-                        productId={product.id}
-                        currentPrice={product.price}
-                        onSuccess={(newPrice) => onSetPrice(product.id, newPrice)}
-                      />
-                    )}
-                    {onEdit && (
-                      <button
-                        onClick={() => onEdit(product)}
-                        className="rounded-lg p-2 text-indigo-600 transition-colors hover:bg-indigo-50 active:scale-95"
-                        title="Düzenle"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </button>
-                    )}
-                    {onDelete && (
-                      <button
-                        onClick={() => onDelete(product.id)}
-                        className="rounded-lg p-2 text-red-600 transition-colors hover:bg-red-50 active:scale-95"
-                        title="Sil"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    )}
+                  <div className="flex justify-end gap-2">
+                    <button
+                      onClick={() => onEdit(product)}
+                      className="rounded-lg p-2 text-indigo-600 transition-colors hover:bg-indigo-50 active:scale-95"
+                      title="Düzenle"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => onDelete(product.id)}
+                      className="rounded-lg p-2 text-red-600 transition-colors hover:bg-red-50 active:scale-95"
+                      title="Sil"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
                 </td>
               </tr>

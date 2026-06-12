@@ -9,11 +9,13 @@ interface CategoryModalProps {
   onSave: (data: CategoryFormData) => void;
   initialData?: Category;
   existingNames: string[];
+  mainCategories?: { id: number; name: string }[];
 }
 
 const emptyForm: CategoryFormData = {
   name: '',
   description: '',
+  categoryId: '',
 };
 
 const NAME_MAX = 50;
@@ -25,6 +27,7 @@ export default function CategoryModal({
   onSave,
   initialData,
   existingNames,
+  mainCategories = [],
 }: CategoryModalProps) {
   const [formData, setFormData] = useState<CategoryFormData>(emptyForm);
   const [nameError, setNameError] = useState('');
@@ -35,7 +38,11 @@ export default function CategoryModal({
     if (isOpen) {
       setFormData(
         initialData
-          ? { name: initialData.name, description: initialData.description }
+          ? { 
+              name: initialData.name, 
+              description: initialData.description || '',
+              categoryId: initialData.category_id ? String(initialData.category_id) : ''
+            }
           : emptyForm,
       );
       setNameError('');
@@ -48,7 +55,7 @@ export default function CategoryModal({
   if (!isOpen) return null;
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
   ) => {
     const { name, value } = e.target;
 
@@ -62,17 +69,17 @@ export default function CategoryModal({
 
   const validateName = (value: string): string => {
     const trimmed = value.trim();
-    if (!trimmed) return 'Kategori adı zorunludur.';
+    if (!trimmed) return 'Alt kategori adı zorunludur.';
 
     const isDuplicate = existingNames
       .filter((n) => (initialData ? n !== initialData.name : true))
       .some((n) => n.toLowerCase() === trimmed.toLowerCase());
 
-    if (isDuplicate) return 'Bu isimde bir kategori zaten mevcut.';
+    if (isDuplicate) return 'Bu isimde bir alt kategori zaten mevcut.';
     return '';
   };
 
-  const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name } = e.target;
     setTouched((prev) => ({ ...prev, [name]: true }));
     if (name === 'name') {
@@ -110,7 +117,7 @@ export default function CategoryModal({
               <Tag className="h-4 w-4 text-indigo-600" />
             </div>
             <h2 className="text-lg font-extrabold text-slate-900">
-              {isEditing ? 'Kategori Düzenle' : 'Yeni Kategori Ekle'}
+              {isEditing ? 'Alt Kategori Düzenle' : 'Yeni Alt Kategori Ekle'}
             </h2>
           </div>
           <button
@@ -125,12 +132,37 @@ export default function CategoryModal({
         {/* Body */}
         <div className="overflow-y-auto px-6 py-6">
           <form id="category-form" onSubmit={handleSubmit} className="flex flex-col gap-5" noValidate>
-            {/* Name */}
+            {/* Parent Category */}
             <div>
+              <div className="mb-1.5 flex items-center justify-between">
+                <label htmlFor="cat-parent" className="flex items-center gap-1.5 text-sm font-bold text-slate-700">
+                  <Tag className="h-3.5 w-3.5 text-slate-400" />
+                  Ana Kategori
+                  <span className="text-red-500">*</span>
+                </label>
+              </div>
+              <select
+                id="cat-parent"
+                name="categoryId"
+                required
+                value={formData.categoryId || ''}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 bg-white"
+              >
+                <option value="" disabled>Ana kategori seçin</option>
+                {mainCategories.map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Name */}
+            <div className={!formData.categoryId ? 'opacity-50 transition-opacity' : 'transition-opacity'}>
               <div className="mb-1.5 flex items-center justify-between">
                 <label htmlFor="cat-name" className="flex items-center gap-1.5 text-sm font-bold text-slate-700">
                   <Tag className="h-3.5 w-3.5 text-slate-400" />
-                  Kategori Adı
+                  Alt Kategori Adı
                   <span className="text-red-500">*</span>
                 </label>
                 <span className={`text-xs font-medium tabular-nums ${nameCharsLeft < 10 ? 'text-amber-500' : 'text-slate-400'}`}>
@@ -141,13 +173,14 @@ export default function CategoryModal({
                 ref={nameInputRef}
                 id="cat-name"
                 required
+                disabled={!formData.categoryId}
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
                 onBlur={handleBlur}
-                placeholder="Örn: Protein"
+                placeholder={formData.categoryId ? "Örn: Whey" : "Önce ana kategori seçin"}
                 autoComplete="off"
-                className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:ring-2 ${
+                className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-all duration-150 focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-50 ${
                   hasNameError
                     ? 'border-red-400 bg-red-50/30 focus:border-red-500 focus:ring-red-200'
                     : 'border-slate-200 focus:border-indigo-500 focus:ring-indigo-100'
