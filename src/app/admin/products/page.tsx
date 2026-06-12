@@ -3,15 +3,41 @@
 import { useState, useMemo } from 'react';
 import { PackagePlus, ArrowDownUp, Loader2 } from 'lucide-react';
 import { Product, fetchProducts, PaginatedProductResponse } from '@/features/products';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import ProductTable from '@/features/admin/products/components/ProductTable';
 import ProductModal from '@/features/admin/products/components/ProductModal';
+import { patchProduct, ProductUpdatePayload } from '@/features/admin/products/api';
 import Link from 'next/link';
 import { useAuthStore } from '@/features/auth';
 
 const QUERY_KEY = ['admin', 'products'] as const;
 
 type SortOption = 'urgency' | 'name_asc' | 'price_asc' | 'price_desc' | 'stock_desc' | 'newest' | 'rating_asc' | 'rating_desc';
+
+function buildPayload(product: Product): ProductUpdatePayload {
+  return {
+    name: product.name,
+    description: product.description,
+    original_price: product.originalPrice,
+    images: product.image ? [product.image] : undefined,
+    stock: product.stockCount,
+    stock_status: product.stockStatus,
+    is_new: product.isNew,
+    brand: product.brand,
+    model: product.model,
+    serial_no: product.serialNumber,
+    warranty: product.warrantyStatus,
+    distributor: product.distributor,
+    sub_type: product.subType,
+    ingredients: product.ingredients,
+    nutrition_facts: product.nutritionFacts,
+    usage_info: product.usage,
+    features: product.features,
+    flavors_json: product.flavors,
+    sizes_json: product.sizes,
+  };
+}
 
 export default function AdminProductsPage() {
   const user = useAuthStore((s) => s.user);
@@ -33,6 +59,40 @@ export default function AdminProductsPage() {
     );
   };
 
+  const editMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: ProductUpdatePayload }) =>
+      patchProduct(id, payload),
+    onSuccess: (_, { id, payload }) => {
+      updateCache((prev) =>
+        prev.map((p) =>
+          p.id === id
+            ? {
+                ...p,
+                name: payload.name ?? p.name,
+                description: payload.description ?? p.description,
+                originalPrice: payload.original_price ?? p.originalPrice,
+                image: payload.images?.[0] ?? p.image,
+                stockCount: payload.stock ?? p.stockCount,
+                stockStatus: (payload.stock_status as Product['stockStatus']) ?? p.stockStatus,
+                isNew: payload.is_new ?? p.isNew,
+                ingredients: payload.ingredients ?? p.ingredients,
+                nutritionFacts: payload.nutrition_facts ?? p.nutritionFacts,
+                usage: payload.usage_info ?? p.usage,
+                features: payload.features ?? p.features,
+                flavors: payload.flavors_json ?? p.flavors,
+                sizes: payload.sizes_json ?? p.sizes,
+              }
+            : p
+        )
+      );
+      toast.success('Ürün başarıyla güncellendi.');
+      setIsModalOpen(false);
+    },
+    onError: (err: string) => {
+      toast.error(err);
+    },
+  });
+
   const handleAddProduct = (newProductData: Omit<Product, 'id'>) => {
     const newProduct: Product = {
       ...newProductData,
@@ -46,8 +106,7 @@ export default function AdminProductsPage() {
   };
 
   const handleEditProduct = (updatedProduct: Product) => {
-    updateCache((prev) => prev.map((p) => (p.id === updatedProduct.id ? updatedProduct : p)));
-    setIsModalOpen(false);
+    editMutation.mutate({ id: updatedProduct.id, payload: buildPayload(updatedProduct) });
   };
 
   const handleDeleteProduct = (id: string) => {
@@ -163,6 +222,7 @@ export default function AdminProductsPage() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         initialData={editingProduct}
+        isSaving={editMutation.isPending}
         onSave={(data) => {
           if (editingProduct) {
             handleEditProduct(data as Product);

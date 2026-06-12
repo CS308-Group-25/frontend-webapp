@@ -8,9 +8,10 @@ interface ProductModalProps {
   onClose: () => void;
   onSave: (product: Omit<Product, 'id'> | Product) => void;
   initialData?: Product;
+  isSaving?: boolean;
 }
 
-export default function ProductModal({ isOpen, onClose, onSave, initialData }: ProductModalProps) {
+export default function ProductModal({ isOpen, onClose, onSave, initialData, isSaving = false }: ProductModalProps) {
   const [formData, setFormData] = useState<Partial<Product>>({
     name: '',
     description: '',
@@ -481,9 +482,10 @@ export default function ProductModal({ isOpen, onClose, onSave, initialData }: P
           <button
             type="submit"
             form="product-form"
-            className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-indigo-700 active:scale-95"
+            disabled={isSaving}
+            className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-indigo-700 active:scale-95 disabled:opacity-50"
           >
-            {initialData ? 'Güncelle' : 'Kaydet'}
+            {isSaving ? '...' : initialData ? 'Güncelle' : 'Kaydet'}
           </button>
         </div>
       </div>
