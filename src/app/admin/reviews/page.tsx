@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { MessageSquare, Loader2, RefreshCw } from 'lucide-react';
+import { MessageSquare, Loader2, RefreshCw, ShieldX } from 'lucide-react';
 import ReviewModerationTable from '@/features/admin/reviews/components/ReviewModerationTable';
 import { fetchAdminReviews, moderateReview, deleteReview } from '@/features/admin/reviews/api';
 import { AdminReview, ReviewApprovalStatus } from '@/features/admin/reviews/types';
+import { useAuthStore } from '@/features/auth';
 
 const STATUS_TABS: { value: ReviewApprovalStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'Tümü' },
@@ -15,6 +16,9 @@ const STATUS_TABS: { value: ReviewApprovalStatus | 'all'; label: string }[] = [
 ];
 
 export default function AdminReviewsPage() {
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
+  const isAuthorized = isAuthenticated && user?.role === 'product_manager';
+
   const [reviews, setReviews] = useState<AdminReview[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -33,6 +37,7 @@ export default function AdminReviewsPage() {
   };
 
   useEffect(() => {
+    if (!isAuthorized) return;
     fetchAdminReviews()
       .then(setReviews)
       .catch(() => {
@@ -40,7 +45,7 @@ export default function AdminReviewsPage() {
         setError(true);
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [isAuthorized]);
 
   const filteredReviews = useMemo(() => {
     if (activeTab === 'all') return reviews;
@@ -73,6 +78,38 @@ export default function AdminReviewsPage() {
     await deleteReview(id);
     setReviews((prev) => prev.filter((r) => r.id !== id));
   };
+
+  if (authLoading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
+          <p className="text-sm font-medium text-slate-500">Yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthorized) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <div className="p-4 bg-red-50 rounded-2xl">
+            <ShieldX className="h-10 w-10 text-red-500" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-slate-900">Yetkisiz Erişim</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Bu sayfaya erişim için ürün yöneticisi yetkisi gereklidir.
+            </p>
+          </div>
+          <Link href="/" className="text-sm font-medium text-indigo-600 hover:underline">
+            Ana sayfaya dön
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
