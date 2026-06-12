@@ -9,92 +9,10 @@ interface ProductModalProps {
   onClose: () => void;
   onSave: (product: Omit<Product, 'id'> | Product) => void | Promise<void>;
   initialData?: Product;
-  categories?: CategoryOption[];
-  brandOptions?: string[];
-  subCategories?: { id: number; name: string; category_id: number }[];
-  categoryOptions?: Record<number, { brands: string[]; subTypes: string[] }>;
   isSaving?: boolean;
 }
 
-const DEFAULT_FLAVOR_COLOR = '#E5E7EB';
-const FLAVOR_COLOR_OPTIONS = [
-  DEFAULT_FLAVOR_COLOR,
-  '#5C3317',
-  '#D2A679',
-  '#F3E5AB',
-  '#E8474C',
-  '#FFE135',
-  '#F59E0B',
-  '#C68E4E',
-  '#22C55E',
-  '#3B82F6',
-  '#7C3AED',
-  '#1E293B',
-];
-const FLAVOR_COLOR_BY_NAME: Record<string, string> = {
-  aromasız: DEFAULT_FLAVOR_COLOR,
-  çikolata: '#5C3317',
-  cikolata: '#5C3317',
-  bisküvi: '#D2A679',
-  biskuvi: '#D2A679',
-  biscuit: '#D2A679',
-  cookie: '#D2A679',
-  vanilya: '#F3E5AB',
-  vanilla: '#F3E5AB',
-  çilek: '#E8474C',
-  cilek: '#E8474C',
-  strawberry: '#E8474C',
-  muz: '#FFE135',
-  banana: '#FFE135',
-  mango: '#F59E0B',
-  karamel: '#C68E4E',
-  caramel: '#C68E4E',
-  'salted caramel': '#C68E4E',
-  'orman meyveli': '#7C3AED',
-  'blue raspberry': '#3B82F6',
-  cola: '#78350F',
-};
-
-function normalizeFlavorName(name: string): string {
-  return name.trim().toLocaleLowerCase('tr-TR');
-}
-
-function isHexColor(value?: string): value is string {
-  return Boolean(value && /^#[0-9A-Fa-f]{6}$/.test(value));
-}
-
-function getFlavorColor(flavor: Partial<ProductFlavor>): string {
-  if (isHexColor(flavor.color)) return flavor.color.toUpperCase();
-
-  return FLAVOR_COLOR_BY_NAME[normalizeFlavorName(flavor.name || '')] || DEFAULT_FLAVOR_COLOR;
-}
-
-function normalizeFlavor(flavor: ProductFlavor): ProductFlavor {
-  return {
-    ...flavor,
-    color: getFlavorColor(flavor),
-  };
-}
-
-function normalizeCategoryName(value?: string): string {
-  return value?.trim().toLocaleLowerCase('tr-TR') ?? '';
-}
-
-function isMissingNumber(value: unknown): boolean {
-  return value === '' || value === undefined || value === null || !Number.isFinite(Number(value));
-}
-
-export default function ProductModal({
-  isOpen,
-  onClose,
-  onSave,
-  initialData,
-  categories = [],
-  brandOptions = [],
-  subCategories = [],
-  categoryOptions = {},
-  isSaving = false,
-}: ProductModalProps) {
+export default function ProductModal({ isOpen, onClose, onSave, initialData, isSaving = false }: ProductModalProps) {
   const [formData, setFormData] = useState<Partial<Product>>({
     name: '',
     description: '',
@@ -855,9 +773,9 @@ export default function ProductModal({
             type="submit"
             form="product-form"
             disabled={isSaving}
-            className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-indigo-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-indigo-700 active:scale-95 disabled:opacity-50"
           >
-            {isSaving ? 'Kaydediliyor...' : initialData ? 'Güncelle' : 'Kaydet'}
+            {isSaving ? '...' : initialData ? 'Güncelle' : 'Kaydet'}
           </button>
         </div>
       </div>

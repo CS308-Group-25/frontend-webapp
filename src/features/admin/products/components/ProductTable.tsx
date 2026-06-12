@@ -1,14 +1,16 @@
 import { Edit, Trash2, Star } from 'lucide-react';
 import { Product, StockBadge } from '@/features/products';
 import Image from 'next/image';
+import SetPriceButton from './SetPriceButton';
 
 interface ProductTableProps {
   products: Product[];
-  onEdit: (product: Product) => void;
-  onDelete: (id: string) => void;
+  onEdit?: (product: Product) => void;
+  onDelete?: (id: string) => void;
+  onSetPrice?: (productId: string, newPrice: number) => void;
 }
 
-export default function ProductTable({ products, onEdit, onDelete }: ProductTableProps) {
+export default function ProductTable({ products, onEdit, onDelete, onSetPrice }: ProductTableProps) {
   if (products.length === 0) {
     return (
       <div className="flex min-h-[300px] flex-col items-center justify-center rounded-2xl bg-white p-8 shadow-sm">
@@ -70,21 +72,32 @@ export default function ProductTable({ products, onEdit, onDelete }: ProductTabl
                   <StockBadge status={product.stockStatus} count={product.stockCount} />
                 </td>
                 <td className="px-6 py-4 text-right">
-                  <div className="flex justify-end gap-2">
-                    <button
-                      onClick={() => onEdit(product)}
-                      className="rounded-lg p-2 text-indigo-600 transition-colors hover:bg-indigo-50 active:scale-95"
-                      title="Düzenle"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => onDelete(product.id)}
-                      className="rounded-lg p-2 text-red-600 transition-colors hover:bg-red-50 active:scale-95"
-                      title="Sil"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                  <div className="flex justify-end gap-2 items-center">
+                    {onSetPrice && (
+                      <SetPriceButton
+                        productId={product.id}
+                        currentPrice={product.price}
+                        onSuccess={(newPrice) => onSetPrice(product.id, newPrice)}
+                      />
+                    )}
+                    {onEdit && (
+                      <button
+                        onClick={() => onEdit(product)}
+                        className="rounded-lg p-2 text-indigo-600 transition-colors hover:bg-indigo-50 active:scale-95"
+                        title="Düzenle"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </button>
+                    )}
+                    {onDelete && (
+                      <button
+                        onClick={() => onDelete(product.id)}
+                        className="rounded-lg p-2 text-red-600 transition-colors hover:bg-red-50 active:scale-95"
+                        title="Sil"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

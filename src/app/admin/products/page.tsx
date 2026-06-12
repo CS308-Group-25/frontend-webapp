@@ -1,23 +1,17 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { PackagePlus, ArrowDownUp } from 'lucide-react';
-import {
-  AdminProductPayload,
-  createAdminProduct,
-  deleteAdminProduct,
-  fetchAdminProducts,
-  fetchCategories,
-  fetchAdminProductDetail,
-  Product,
-  updateAdminProduct,
-} from '@/features/products';
+import { PackagePlus, ArrowDownUp, Loader2 } from 'lucide-react';
+import { Product, fetchProducts, PaginatedProductResponse } from '@/features/products';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import ProductTable from '@/features/admin/products/components/ProductTable';
 import ProductModal from '@/features/admin/products/components/ProductModal';
-import { fetchAdminCategories } from '@/features/admin/categories/api/categories.api';
+import { patchProduct, ProductUpdatePayload } from '@/features/admin/products/api';
 import Link from 'next/link';
-import { toast } from 'sonner';
+import { useAuthStore } from '@/features/auth';
+
+const QUERY_KEY = ['admin', 'products'] as const;
 
 type SortOption = 'urgency' | 'name_asc' | 'stock_desc' | 'newest' | 'rating_asc' | 'rating_desc';
 type CategoryFieldObject = {
@@ -206,130 +200,99 @@ function getCatalogCategoryEntries(productsData: ProductListingMetadata | undefi
   return categorySources.find((source): source is CategoryFieldItem[] => Array.isArray(source)) ?? [];
 }
 
+function buildPayload(product: Product): ProductUpdatePayload {
+  return {
+    name: product.name,
+    description: product.description,
+    original_price: product.originalPrice,
+    images: product.image ? [product.image] : undefined,
+    stock: product.stockCount,
+    stock_status: product.stockStatus,
+    is_new: product.isNew,
+    brand: product.brand,
+    model: product.model,
+    serial_no: product.serialNumber,
+    warranty: product.warrantyStatus,
+    distributor: product.distributor,
+    sub_type: product.subType,
+    ingredients: product.ingredients,
+    nutrition_facts: product.nutritionFacts,
+    usage_info: product.usage,
+    features: product.features,
+    flavors_json: product.flavors,
+    sizes_json: product.sizes,
+  };
+}
+
 export default function AdminProductsPage() {
+  const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | undefined>();
   const [sortBy, setSortBy] = useState<SortOption>('urgency');
 
-  const { data: productsData, isLoading, isError } = useQuery({
-    queryKey: ['products', 'admin'],
-    queryFn: () => fetchAdminProducts(1000),
-  });
-  const { data: categories = [] } = useQuery({
-    queryKey: ['categories'],
-    queryFn: fetchCategories,
+  const { data, isLoading, isError } = useQuery({
+    queryKey: QUERY_KEY,
+    queryFn: () => fetchProducts(200),
   });
 
-  const { data: subCategories = [] } = useQuery({
-    queryKey: ['admin-categories'],
-    queryFn: fetchAdminCategories,
-  });
+  const products = useMemo(() => data?.items ?? [], [data]);
 
-  const createProductMutation = useMutation({
-    mutationFn: (product: Omit<Product, 'id'>) =>
-      createAdminProduct(productToAdminPayload(product)),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      toast.success('Ürün oluşturuldu.');
+  const updateCache = (updater: (prev: Product[]) => Product[]) => {
+    queryClient.setQueryData<PaginatedProductResponse>(QUERY_KEY, (old) =>
+      old ? { ...old, items: updater(old.items) } : old
+    );
+  };
+
+  const editMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: ProductUpdatePayload }) =>
+      patchProduct(id, payload),
+    onSuccess: (_, { id, payload }) => {
+      updateCache((prev) =>
+        prev.map((p) =>
+          p.id === id
+            ? {
+                ...p,
+                name: payload.name ?? p.name,
+                description: payload.description ?? p.description,
+                originalPrice: payload.original_price ?? p.originalPrice,
+                image: payload.images?.[0] ?? p.image,
+                stockCount: payload.stock ?? p.stockCount,
+                stockStatus: (payload.stock_status as Product['stockStatus']) ?? p.stockStatus,
+                isNew: payload.is_new ?? p.isNew,
+                ingredients: payload.ingredients ?? p.ingredients,
+                nutritionFacts: payload.nutrition_facts ?? p.nutritionFacts,
+                usage: payload.usage_info ?? p.usage,
+                features: payload.features ?? p.features,
+                flavors: payload.flavors_json ?? p.flavors,
+                sizes: payload.sizes_json ?? p.sizes,
+              }
+            : p
+        )
+      );
+      toast.success('Ürün başarıyla güncellendi.');
       setIsModalOpen(false);
     },
-    onError: (error) => {
-      toast.error(String(error));
+    onError: (err: string) => {
+      toast.error(err);
     },
   });
 
-  const updateProductMutation = useMutation({
-    mutationFn: (product: Product) =>
-      updateAdminProduct(product.id, productToAdminPayload(product)),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      toast.success('Ürün güncellendi.');
-      setIsModalOpen(false);
-    }, 
-    onError: (error) => {
-      toast.error(String(error));
-    },
-  });
-
-  const deleteProductMutation = useMutation({
-    mutationFn: deleteAdminProduct,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      toast.success('Ürün silindi.');
-    },
-    onError: (error) => {
-      toast.error(String(error));
-    },
-  });
-
-  const products = useMemo(() => productsData?.items ?? [], [productsData]);
-  const productCategoryOptions = useMemo(() => {
-    const optionsById: Record<number, CategoryOptionSet> = {};
-    const optionsByName: Record<string, CategoryOptionSet> = {};
-
-    products.forEach((product) => {
-      const categoryName = normalizeCategoryName(product.category);
-      const parentCategoryNames = getParentCategoryKeys(product);
-      const targetOptions = [
-        product.categoryId
-          ? (optionsById[product.categoryId] ??= {
-              brands: [],
-              subTypes: [],
-            })
-          : undefined,
-        categoryName
-          ? (optionsByName[categoryName] ??= {
-              brands: [],
-              subTypes: [],
-            })
-          : undefined,
-        ...parentCategoryNames.map((parentCategoryName) => (
-          optionsByName[parentCategoryName] ??= {
-            brands: [],
-            subTypes: [],
-          }
-        )),
-      ].filter((option): option is CategoryOptionSet => Boolean(option));
-
-      if (targetOptions.length === 0) return;
-
-      if (product.brand) {
-        targetOptions.forEach((option) => option.brands.push(product.brand as string));
-      }
-
-      if (product.subType) {
-        targetOptions.forEach((option) => option.subTypes.push(product.subType as string));
-      }
-    });
-
-    return {
-      optionsById: Object.fromEntries(
-        Object.entries(optionsById).map(([categoryId, values]) => [
-          Number(categoryId),
-          {
-            brands: values.brands,
-            subTypes: values.subTypes,
-          },
-        ]),
-      ),
-      optionsByName: Object.fromEntries(
-        Object.entries(optionsByName).map(([categoryName, values]) => [
-          categoryName,
-          {
-            brands: values.brands,
-            subTypes: values.subTypes,
-          },
-        ]),
-      ),
+  const handleAddProduct = (newProductData: Omit<Product, 'id'>) => {
+    const newProduct: Product = {
+      ...newProductData,
+      id: Math.random().toString(36).substr(2, 9),
+      rating: 0,
+      reviewCount: 0,
+      isNew: true,
     };
-  }, [products]);
-  const listingCategoryOptions = useMemo(() => {
-    const optionsById: Record<number, CategoryOptionSet> = {};
-    const optionsByName: Record<string, CategoryOptionSet> = {};
+    updateCache((prev) => [newProduct, ...prev]);
+    setIsModalOpen(false);
+  };
 
-    getCatalogCategoryEntries(productsData as ProductListingMetadata | undefined).forEach((category) => {
-      if (!category || typeof category !== 'object') return;
+  const handleEditProduct = (updatedProduct: Product) => {
+    editMutation.mutate({ id: updatedProduct.id, payload: buildPayload(updatedProduct) });
+  };
 
       const idValue = category.id ?? category.category_id ?? category.categoryId;
       const categoryId = typeof idValue === 'number' ? idValue : Number(idValue);
@@ -427,25 +390,12 @@ export default function AdminProductsPage() {
 
   const handleDeleteProduct = async (id: string) => {
     if (confirm('Bu ürünü silmek istediğinize emin misiniz?')) {
-      await deleteProductMutation.mutateAsync(id);
+      updateCache((prev) => prev.filter((p) => p.id !== id));
     }
   };
 
-  const openAddModal = () => {
-    setEditingProduct(undefined);
-    setIsModalOpen(true);
-  };
-
-  const openEditModal = async (product: Product) => {
-    try {
-      const productDetail = await fetchAdminProductDetail(product.id);
-      setEditingProduct({ ...product, ...productDetail });
-    } catch (error) {
-      toast.error(String(error));
-      setEditingProduct(product);
-    }
-
-    setIsModalOpen(true);
+  const handleSetPrice = (id: string, newPrice: number) => {
+    updateCache((prev) => prev.map((p) => (p.id === id ? { ...p, price: newPrice } : p)));
   };
 
   const sortedProducts = useMemo(() => {
@@ -457,7 +407,6 @@ export default function AdminProductsPage() {
         return list.sort((a, b) => {
           const urgencyDiff = urgencyMap[a.stockStatus] - urgencyMap[b.stockStatus];
           if (urgencyDiff !== 0) return urgencyDiff;
-          // secondary sort by stock count if same urgency
           return (a.stockCount || 0) - (b.stockCount || 0);
         });
       }
@@ -470,9 +419,6 @@ export default function AdminProductsPage() {
       case 'rating_desc':
         return list.sort((a, b) => (b.rating || 0) - (a.rating || 0));
       case 'newest':
-        // list uses insertion order natively (we prepend new products). 
-        // We can just return it to respect literal newest-first.
-        // For mock items, pushing 'isNew' items up inside existing order visually helps.
         return list.sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0));
       default:
         return list;
@@ -514,31 +460,33 @@ export default function AdminProductsPage() {
               <option value="rating_asc">Rating (En Düşük)</option>
             </select>
           </div>
-          <button
-            onClick={openAddModal}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-indigo-500/20 transition-all hover:bg-indigo-700 hover:shadow-lg active:scale-95 sm:w-auto"
-          >
-            <PackagePlus className="h-5 w-5" />
-            Yeni Ürün
-          </button>
+          {user?.role === 'product_manager' && (
+            <button
+              onClick={() => { setEditingProduct(undefined); setIsModalOpen(true); }}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-indigo-500/20 transition-all hover:bg-indigo-700 hover:shadow-lg active:scale-95 sm:w-auto"
+            >
+              <PackagePlus className="h-5 w-5" />
+              Yeni Ürün
+            </button>
+          )}
         </div>
       </div>
 
+      {/* Content */}
       {isLoading ? (
-        <div className="flex min-h-[300px] flex-col items-center justify-center rounded-2xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
-          <p className="mt-3 text-sm font-medium text-slate-500">Ürünler yükleniyor...</p>
+        <div className="flex min-h-[300px] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
         </div>
       ) : isError ? (
-        <div className="flex min-h-[300px] flex-col items-center justify-center rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-red-100">
-          <p className="text-lg font-bold text-red-600">Ürünler yüklenemedi.</p>
-          <p className="mt-1 text-sm text-red-400">Backend bağlantısını kontrol edip tekrar deneyin.</p>
+        <div className="flex min-h-[300px] items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+          <p className="text-sm font-medium text-red-500">Ürünler yüklenirken bir hata oluştu.</p>
         </div>
       ) : (
         <ProductTable
           products={sortedProducts}
-          onEdit={openEditModal}
-          onDelete={handleDeleteProduct}
+          onEdit={user?.role === 'product_manager' ? (product) => { setEditingProduct(product); setIsModalOpen(true); } : undefined}
+          onDelete={user?.role === 'product_manager' ? handleDeleteProduct : undefined}
+          onSetPrice={user?.role === 'sales_manager' ? handleSetPrice : undefined}
         />
       )}
 
@@ -547,11 +495,7 @@ export default function AdminProductsPage() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         initialData={editingProduct}
-        categories={categories}
-        subCategories={subCategories}
-        brandOptions={brandOptions}
-        categoryOptions={categoryOptions}
-        isSaving={isSaving}
+        isSaving={editMutation.isPending}
         onSave={(data) => {
           if (editingProduct) {
             updateProductMutation.mutate({ ...editingProduct, ...(data as Product) });
