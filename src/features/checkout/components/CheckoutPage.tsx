@@ -13,6 +13,7 @@ import PaymentStep from './PaymentStep';
 import OrderSummaryPanel from './OrderSummaryPanel';
 import { CheckoutStep, AddressFormData, PaymentMethod } from '../types';
 import { createOrder, CreateOrderPayload } from '../api';
+import { saveAddress } from '../addressApi';
 import { CreditCardFormValues } from '../schemas';
 
 function detectCardBrand(cardNumber: string): string {
@@ -22,7 +23,10 @@ function detectCardBrand(cardNumber: string): string {
   return 'Unknown';
 }
 
-function getPaymentMethodLabel(method: PaymentMethod, cardNumber: string): string {
+function getPaymentMethodLabel(
+  method: PaymentMethod,
+  cardNumber: string
+): string {
   if (method === 'cod_cash') return 'Kapıda Ödeme (Nakit)';
   if (method === 'cod_card') return 'Kapıda Ödeme (Kredi Kartı)';
   return cardNumber ? detectCardBrand(cardNumber) : 'Kredi Kartı';
@@ -34,7 +38,8 @@ export default function CheckoutPage() {
   const { items, clearCart } = useCartStore();
   const [step, setStep] = useState<CheckoutStep>(1);
   const [addressData, setAddressData] = useState<AddressFormData | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('credit_card');
+  const [paymentMethod, setPaymentMethod] =
+    useState<PaymentMethod>('credit_card');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleAddressComplete = (data: AddressFormData) => {
@@ -64,10 +69,14 @@ export default function CheckoutPage() {
       // Re-sending them via bulk would DOUBLE quantities on the server (backend does qty += existing).
       // We only send items that truly weren't synced (no cartItemId = never reached the server).
       const unsynced = items.filter(
-        (i) => !i.cartItemId && !isNaN(parseInt(i.productId)) && parseInt(i.productId) > 0
+        (i) =>
+          !i.cartItemId &&
+          !isNaN(parseInt(i.productId)) &&
+          parseInt(i.productId) > 0
       );
       if (unsynced.length > 0) {
-        const { bulkAddCartItems } = await import('@/features/cart/api/cart.api');
+        const { bulkAddCartItems } =
+          await import('@/features/cart/api/cart.api');
         await bulkAddCartItems(
           unsynced.map((i) => ({
             product_id: parseInt(i.productId),
@@ -75,7 +84,6 @@ export default function CheckoutPage() {
           }))
         );
       }
-
 
       const deliveryAddress = [
         `${addressData.firstName} ${addressData.lastName}`,
@@ -100,6 +108,22 @@ export default function CheckoutPage() {
       };
 
       const order = await createOrder(payload);
+
+      if (addressData.saveAddress) {
+        await saveAddress({
+          title: addressData.title,
+          first_name: addressData.firstName,
+          last_name: addressData.lastName,
+          address: addressData.address,
+          apartment: addressData.apartment,
+          city: addressData.city,
+          district: addressData.district,
+          phone: addressData.phone,
+        }).catch(() => {
+          toast.warning('Adres kaydedilemedi, ancak siparişiniz oluşturuldu.');
+        });
+      }
+
       clearCart();
       // Invalidate product cache so stock counts reflect the purchase
       // 'products' covers the listing page, 'product' covers individual detail pages
@@ -113,7 +137,8 @@ export default function CheckoutPage() {
       router.push(`/orders/${order.id}?new=1`);
     } catch (err) {
       toast.error('Sipariş oluşturulamadı.', {
-        description: typeof err === 'string' ? err : 'Lütfen bilgilerinizi kontrol edin.',
+        description:
+          typeof err === 'string' ? err : 'Lütfen bilgilerinizi kontrol edin.',
       });
     } finally {
       setIsSubmitting(false);
@@ -123,12 +148,14 @@ export default function CheckoutPage() {
   if (items.length === 0 && step === 1) {
     return (
       <ProtectedRoute>
-        <div className="min-h-[60vh] flex flex-col items-center justify-center text-center gap-4 px-4">
+        <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-4 text-center">
           <p className="text-xl font-bold text-slate-700">Sepetiniz boş</p>
-          <p className="text-slate-500 text-sm">Ödeme yapmak için önce sepetinize ürün ekleyin.</p>
+          <p className="text-sm text-slate-500">
+            Ödeme yapmak için önce sepetinize ürün ekleyin.
+          </p>
           <button
             onClick={() => router.push('/search')}
-            className="px-6 py-3 bg-indigo-700 text-white font-bold rounded-xl hover:bg-indigo-800 transition-colors"
+            className="rounded-xl bg-indigo-700 px-6 py-3 font-bold text-white transition-colors hover:bg-indigo-800"
           >
             Alışverişe Başla
           </button>
@@ -140,16 +167,16 @@ export default function CheckoutPage() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-slate-50">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-8 items-start">
+        <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[1fr_400px]">
             {/* Left: Steps */}
             <div>
               <StepIndicator currentStep={step} />
 
               {step === 1 && (
                 <div>
-                  <h2 className="text-xl font-black text-slate-900 mb-4">
-                    <span className="inline-flex items-center justify-center w-8 h-8 bg-indigo-700 text-white rounded-full text-sm font-bold mr-2">
+                  <h2 className="mb-4 text-xl font-black text-slate-900">
+                    <span className="mr-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-indigo-700 text-sm font-bold text-white">
                       1
                     </span>
                     Adres
@@ -163,8 +190,8 @@ export default function CheckoutPage() {
 
               {step === 2 && addressData && (
                 <div>
-                  <h2 className="text-xl font-black text-slate-900 mb-4">
-                    <span className="inline-flex items-center justify-center w-8 h-8 bg-indigo-700 text-white rounded-full text-sm font-bold mr-2">
+                  <h2 className="mb-4 text-xl font-black text-slate-900">
+                    <span className="mr-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-indigo-700 text-sm font-bold text-white">
                       2
                     </span>
                     Kargo
@@ -179,8 +206,8 @@ export default function CheckoutPage() {
 
               {step === 3 && addressData && (
                 <div>
-                  <h2 className="text-xl font-black text-slate-900 mb-4">
-                    <span className="inline-flex items-center justify-center w-8 h-8 bg-indigo-700 text-white rounded-full text-sm font-bold mr-2">
+                  <h2 className="mb-4 text-xl font-black text-slate-900">
+                    <span className="mr-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-indigo-700 text-sm font-bold text-white">
                       3
                     </span>
                     Ödeme
